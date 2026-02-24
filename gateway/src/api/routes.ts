@@ -40,6 +40,7 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
         byCategory: services.skills.getSkillsByCategory(),
       },
       heartbeat: services.heartbeat.getContext(),
+      autonomous: services.heartbeat.getAutonomousStatus(),
       permissions: services.permissions.preset,
       cache: services.aiRouter.getCacheStats(),
     });
@@ -303,7 +304,9 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
       'costs.dailyLimit', 'costs.monthlyLimit',
       'heartbeat.intervalMinutes', 'heartbeat.dailyWordGoal',
       'heartbeat.enableReminders', 'heartbeat.quietHoursStart',
-      'heartbeat.quietHoursEnd', 'ai.defaultTemperature',
+      'heartbeat.quietHoursEnd', 'heartbeat.autonomousEnabled',
+      'heartbeat.autonomousIntervalMinutes', 'heartbeat.maxAutonomousStepsPerWake',
+      'ai.defaultTemperature',
       'ai.ollama.enabled', 'ai.ollama.endpoint', 'ai.ollama.model',
       'bridges.telegram.enabled', 'bridges.telegram.pairingEnabled',
     ];
@@ -604,6 +607,48 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
     }
     const deleted = goals.deleteGoal(req.params.id);
     res.json({ success: deleted });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Autonomous Heartbeat Mode
+  // ═══════════════════════════════════════════════════════════
+
+  // Get autonomous mode status
+  app.get('/api/autonomous/status', (_req: Request, res: Response) => {
+    res.json(services.heartbeat.getAutonomousStatus());
+  });
+
+  // Enable autonomous mode
+  app.post('/api/autonomous/enable', (_req: Request, res: Response) => {
+    services.heartbeat.enableAutonomous();
+    res.json({ success: true, status: services.heartbeat.getAutonomousStatus() });
+  });
+
+  // Disable autonomous mode
+  app.post('/api/autonomous/disable', (_req: Request, res: Response) => {
+    services.heartbeat.disableAutonomous();
+    res.json({ success: true, status: services.heartbeat.getAutonomousStatus() });
+  });
+
+  // Pause autonomous mode
+  app.post('/api/autonomous/pause', (_req: Request, res: Response) => {
+    services.heartbeat.pauseAutonomous();
+    res.json({ success: true, status: services.heartbeat.getAutonomousStatus() });
+  });
+
+  // Resume autonomous mode
+  app.post('/api/autonomous/resume', (_req: Request, res: Response) => {
+    services.heartbeat.resumeAutonomous();
+    res.json({ success: true, status: services.heartbeat.getAutonomousStatus() });
+  });
+
+  // Update autonomous config (interval, max steps, quiet hours)
+  app.post('/api/autonomous/config', (req: Request, res: Response) => {
+    const { intervalMinutes, maxStepsPerWake, quietHoursStart, quietHoursEnd } = req.body;
+    services.heartbeat.updateAutonomousConfig({
+      intervalMinutes, maxStepsPerWake, quietHoursStart, quietHoursEnd,
+    });
+    res.json({ success: true, status: services.heartbeat.getAutonomousStatus() });
   });
 
   // ── Author OS tools status ──

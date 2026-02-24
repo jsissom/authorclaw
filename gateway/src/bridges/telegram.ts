@@ -30,6 +30,7 @@ export class TelegramBridge {
   private commandHandlers?: CommandHandlers;
   private lastUpdateId = 0;
   public pauseRequested = false;
+  private knownChatIds: Set<number> = new Set(); // Track chat IDs for broadcasting
 
   constructor(token: string, config: Partial<TelegramConfig>) {
     this.token = token;
@@ -81,6 +82,9 @@ export class TelegramBridge {
             '🔒 Not authorized. Ask the owner to add your ID (' + userId + ') in the dashboard.');
           continue;
         }
+
+        // Track chat ID for broadcasting (only for allowed users)
+        this.knownChatIds.add(chatId);
 
         // Route to appropriate handler
         await this.handleInput(chatId, message.text, userName);
@@ -368,6 +372,20 @@ export class TelegramBridge {
   /** Update allowed users on a live bridge (called when dashboard saves users) */
   updateAllowedUsers(users: string[]): void {
     this.config.allowedUsers = users;
+  }
+
+  /**
+   * Broadcast a message to all known allowed users.
+   * Used by autonomous heartbeat to send status updates.
+   */
+  async broadcastToAllowed(message: string): Promise<void> {
+    for (const chatId of this.knownChatIds) {
+      try {
+        await this.sendMessage(chatId, message);
+      } catch (e) {
+        console.error(`Telegram broadcast to ${chatId} failed:`, e);
+      }
+    }
   }
 
   disconnect(): void {

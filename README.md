@@ -206,7 +206,7 @@ Skills are automatically matched by keyword triggers and injected into the AI's 
 
 ### Premium Skills Bundle
 
-The **AuthorClaw Premium Skills Bundle** adds 10 advanced capabilities — available on our [Ko-Fi store](https://ko-fi.com/writingsecrets) *(link coming soon)*:
+The **AuthorClaw Premium Skills Bundle** adds 10 advanced capabilities — available on our [Ko-Fi store](https://ko-fi.com/s/4e24f1dfa5):
 
 - **Ghostwriter Pro** — Scene generation, pacing analysis, tension mapping, deep write mode, dialogue polish
 - **Series Architect** — Multi-book series planning, continuity engine, thread tracker, revenue projections

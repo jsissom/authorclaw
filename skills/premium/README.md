@@ -17,7 +17,7 @@ The **AuthorClaw Premium Skills Bundle** includes **10 premium skills** in one p
 - **Narrative Voice Coach** — 47-marker voice analysis, consistency checking, style coaching
 - **Writing Secrets Integration** — Bridges for Book Bible Engine, Workflow Engine, and StyleClone Pro
 
-**Purchase:** [Ko-Fi Store](https://ko-fi.com/writingsecrets) *(link coming soon)*
+**Purchase:** [Ko-Fi Store](https://ko-fi.com/s/4e24f1dfa5)
 
 ## Installation
 

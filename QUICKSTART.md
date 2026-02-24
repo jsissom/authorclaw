@@ -91,7 +91,7 @@ AuthorClaw gets smarter with better models. In Settings, add:
 
 Extend AuthorClaw with advanced writing capabilities. The **Premium Skills Bundle** includes 10 premium skills — Ghostwriter Pro, Series Architect, Book Launch Machine, First Chapter Hook, Comp Title Finder, Dictation Cleanup, Sensitivity Reader, Read Aloud, Narrative Voice Coach, and Writing Secrets Integration — all in one package.
 
-**Get it on Ko-Fi:** [ko-fi.com/writingsecrets](https://ko-fi.com/writingsecrets) *(link coming soon)*
+**Get it on Ko-Fi:** [ko-fi.com/writingsecrets](https://ko-fi.com/s/4e24f1dfa5)
 
 ### Install Premium Skills
 

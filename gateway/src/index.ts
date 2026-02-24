@@ -197,8 +197,34 @@ class AuthorClawGateway {
 
     // ── Phase 7: Heartbeat ──
     this.heartbeat = new HeartbeatService(this.config.get('heartbeat'), this.memory);
+
+    // Wire autonomous mode — heartbeat can now trigger goal steps on a schedule
+    const commandHandlers = this.buildTelegramCommandHandlers();
+    this.heartbeat.setAutonomous(
+      // Run one goal step (reuses the same logic as Telegram /goal command)
+      async (goalId: string) => commandHandlers.startAndRunGoal(goalId),
+      // List goals with remaining step counts
+      () => this.goalEngine.listGoals().map(g => ({
+        id: g.id,
+        title: g.title,
+        status: g.status,
+        progress: `${g.progress}%`,
+        stepsRemaining: g.steps.filter(s => s.status === 'pending' || s.status === 'active').length,
+      })),
+      // Broadcast status to dashboard (WebSocket) and Telegram
+      (message: string) => {
+        this.io.emit('autonomous-status', { message, timestamp: new Date().toISOString() });
+        if (this.telegram) {
+          this.telegram.broadcastToAllowed?.(message);
+        }
+      }
+    );
+
     this.heartbeat.start();
-    console.log(`  ✓ Heartbeat: every ${this.config.get('heartbeat.intervalMinutes', 15)} minutes`);
+    const autonomousLabel = this.config.get('heartbeat.autonomousEnabled')
+      ? ` + autonomous every ${this.config.get('heartbeat.autonomousIntervalMinutes', 30)}min`
+      : '';
+    console.log(`  ✓ Heartbeat: every ${this.config.get('heartbeat.intervalMinutes', 15)} minutes${autonomousLabel}`);
 
     // ── Phase 8: Bridges ──
     if (this.config.get('bridges.telegram.enabled')) {
@@ -208,7 +234,7 @@ class AuthorClawGateway {
         this.telegram.onMessage((content, channel, respond) =>
           this.handleMessage(content, channel, respond)
         );
-        this.telegram.setCommandHandlers(this.buildTelegramCommandHandlers());
+        this.telegram.setCommandHandlers(commandHandlers);
         await this.telegram.connect();
         console.log('  ✓ Telegram bridge connected (command center mode)');
       } else {
