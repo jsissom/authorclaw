@@ -1,0 +1,21 @@
+node_modules/
+gateway/dist/
+.env
+config/.vault/
+config/user.json
+workspace/memory/conversations/
+workspace/memory/voice-data/
+workspace/.audit/
+workspace/exports/
+workspace/projects/*/chapters/
+workspace/projects/*/research/
+workspace/projects/*/submissions/
+*.log
+.DS_Store
+
+# Premium skill packs (purchased separately, not bundled)
+skills/premium/*/
+!skills/premium/README.md
+
+# Author OS tools (mounted at runtime)
+author-os/

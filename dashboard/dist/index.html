@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuthorClaw Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* Header */
+  .header { background: #16213e; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f3460; flex-wrap: wrap; gap: 8px; }
+  .header h1 { font-size: 22px; white-space: nowrap; }
+  .header .version { color: #7f8c8d; font-size: 13px; }
+  .header .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  .status-dot.ok { background: #2ecc71; }
+  .status-dot.err { background: #e74c3c; }
+  .status-dot.warn { background: #f39c12; }
+
+  /* Tabs */
+  .tabs { display: flex; background: #16213e; border-bottom: 1px solid #0f3460; overflow-x: auto; }
+  .tab { padding: 12px 24px; cursor: pointer; color: #7f8c8d; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
+  .tab:hover { color: #bdc3c7; }
+  .tab.active { color: #e0e0e0; border-bottom-color: #e67e22; }
+
+  /* Content */
+  .content { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .card { background: #16213e; border-radius: 10px; padding: 20px; margin-bottom: 18px; border: 1px solid #0f3460; }
+  .card h3 { font-size: 15px; color: #e67e22; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Forms */
+  .form-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .form-group label { font-size: 13px; color: #bdc3c7; font-weight: 600; }
+  .form-group-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  select, input[type="password"], input[type="text"], input[type="number"], textarea {
+    background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 8px 12px;
+    border-radius: 6px; font-size: 14px; font-family: inherit; width: 100%;
+  }
+  select { min-width: 180px; width: auto; }
+  input[type="password"] { flex: 1; }
+  textarea { resize: vertical; min-height: 60px; }
+  button { background: #e67e22; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; }
+  button:hover { background: #d35400; }
+  button:disabled { background: #555; cursor: not-allowed; }
+  button.danger { background: #c0392b; }
+  button.danger:hover { background: #96281b; }
+  button.secondary { background: #2c3e50; }
+  button.secondary:hover { background: #34495e; }
+  button.success { background: #27ae60; }
+  button.success:hover { background: #1e8449; }
+
+  /* Toggle switch */
+  .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+  .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #2c3e50; border-radius: 24px; transition: 0.3s; }
+  .toggle .slider:before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #e0e0e0; border-radius: 50%; transition: 0.3s; }
+  .toggle input:checked + .slider { background: #e67e22; }
+  .toggle input:checked + .slider:before { transform: translateX(20px); }
+
+  /* Key list */
+  .key-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .key-tag { background: #1a1a2e; border: 1px solid #0f3460; padding: 6px 12px; border-radius: 20px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .key-tag .del { cursor: pointer; color: #e74c3c; font-weight: bold; }
+
+  /* Provider list */
+  .provider { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #0f3460; }
+  .provider:last-child { border: none; }
+  .tier { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .tier.free { background: #27ae60; color: #fff; }
+  .tier.cheap { background: #f39c12; color: #fff; }
+  .tier.paid { background: #8e44ad; color: #fff; }
+
+  /* Test result */
+  .test-result { margin-top: 10px; background: #1a1a2e; border-radius: 6px; padding: 12px; font-size: 13px; max-height: 200px; overflow-y: auto; display: none; white-space: pre-wrap; }
+
+  /* Error / success banners */
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; z-index: 9999; animation: slideIn 0.3s ease; max-width: 400px; }
+  .toast.success { background: #27ae60; color: #fff; }
+  .toast.error { background: #c0392b; color: #fff; }
+  .toast.info { background: #2980b9; color: #fff; }
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* Progress bar */
+  .progress-bar { background: #1a1a2e; border-radius: 10px; height: 28px; overflow: hidden; position: relative; }
+  .progress-fill { background: linear-gradient(90deg, #e67e22, #f39c12); height: 100%; border-radius: 10px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; min-width: 40px; }
+
+  /* Chapter grid */
+  .chapter-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .chapter-box { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; transition: all 0.3s; }
+  .chapter-box.pending { background: #2c3e50; color: #7f8c8d; }
+  .chapter-box.writing { background: #2980b9; color: #fff; animation: pulse 1.5s infinite; }
+  .chapter-box.drafted { background: #27ae60; color: #fff; }
+  .chapter-box.revised { background: #8e44ad; color: #fff; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+  /* Stats row */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+  .stat { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 16px; text-align: center; }
+  .stat .value { font-size: 28px; font-weight: 700; color: #e67e22; }
+  .stat .label { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+
+  /* Log entries */
+  .log-entry { padding: 10px 0; border-bottom: 1px solid #0f3460; font-size: 13px; }
+  .log-entry:last-child { border: none; }
+  .log-time { color: #7f8c8d; font-size: 11px; }
+  .log-phase { display: inline-block; background: #0f3460; color: #e67e22; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 6px; }
+  .log-text { margin-top: 4px; line-height: 1.5; color: #e0e0e0; }
+  .log-narration { margin-top: 4px; line-height: 1.5; color: #bdc3c7; font-style: italic; border-left: 3px solid #e67e22; padding-left: 10px; }
+
+  /* Phase indicator */
+  .phase-banner { background: linear-gradient(135deg, #0f3460, #16213e); border: 2px solid #e67e22; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 18px; }
+  .phase-banner .phase-name { font-size: 22px; font-weight: 700; }
+  .phase-banner .phase-step { font-size: 14px; color: #bdc3c7; margin-top: 6px; }
+  .phase-banner .phase-model { font-size: 12px; color: #e67e22; margin-top: 4px; }
+
+  .idle-message { text-align: center; padding: 60px 20px; color: #7f8c8d; }
+  .idle-message h2 { font-size: 20px; margin-bottom: 10px; }
+
+  .stop-section { text-align: center; margin-top: 18px; padding: 16px; background: #1a1a2e; border-radius: 8px; border: 1px dashed #0f3460; }
+  .stop-section p { color: #7f8c8d; font-size: 13px; margin-top: 8px; }
+
+  /* Goal cards */
+  .goal-template { background: #1a1a2e; border: 1px solid #0f3460; border-radius: 10px; padding: 16px; cursor: pointer; transition: all 0.2s; }
+  .goal-template:hover { border-color: #e67e22; transform: translateY(-2px); }
+  .goal-template .gt-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .goal-template .gt-desc { font-size: 13px; color: #7f8c8d; }
+  .goal-template .gt-steps { font-size: 12px; color: #e67e22; margin-top: 6px; }
+  .goal-templates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+
+  .goal-item { background: #1a1a2e; border: 1px solid #0f3460; border-radius: 10px; padding: 16px; margin-bottom: 10px; }
+  .goal-item .gi-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .goal-item .gi-title { font-weight: 700; font-size: 15px; }
+  .goal-item .gi-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .gi-status.pending { background: #2c3e50; color: #7f8c8d; }
+  .gi-status.active { background: #2980b9; color: #fff; }
+  .gi-status.paused { background: #f39c12; color: #fff; }
+  .gi-status.completed { background: #27ae60; color: #fff; }
+  .gi-status.failed { background: #c0392b; color: #fff; }
+  .goal-item .gi-progress { margin: 8px 0; }
+  .goal-item .gi-steps { font-size: 12px; color: #7f8c8d; }
+  .goal-item .gi-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .goal-item .gi-actions button { font-size: 12px; padding: 5px 12px; }
+
+  .step-list { margin-top: 10px; }
+  .step-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #0f3460; font-size: 13px; }
+  .step-item:last-child { border: none; }
+  .step-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .step-dot.pending { background: #2c3e50; }
+  .step-dot.active { background: #2980b9; animation: pulse 1.5s infinite; }
+  .step-dot.completed { background: #27ae60; }
+  .step-dot.skipped { background: #7f8c8d; }
+  .step-dot.failed { background: #c0392b; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header { padding: 12px 16px; }
+    .header h1 { font-size: 18px; }
+    .content { padding: 0 12px; margin: 12px auto; }
+    .tab { padding: 10px 16px; font-size: 13px; }
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat .value { font-size: 22px; }
+    .chapter-grid { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .chapter-box { font-size: 12px; }
+    .form-group-inline { grid-template-columns: 1fr; }
+    .form-row { flex-direction: column; align-items: stretch; }
+    .form-row select { min-width: 100%; }
+    .goal-templates-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 480px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .chapter-grid { grid-template-columns: repeat(5, 1fr); gap: 3px; }
+    .tab { padding: 8px 10px; font-size: 12px; }
+  }
+
+  /* Section divider */
+  .section-divider { border: none; border-top: 1px solid #0f3460; margin: 16px 0; }
+
+  /* Inline hint text */
+  .hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span class="status-dot ok" id="healthDot"></span> &#9997;&#65039; AuthorClaw</h1>
+  <span class="version" id="versionLabel">v1.0.0 &mdash; The Secure AI Writing Agent</span>
+</div>
+
+<div class="tabs" id="tabBar">
+  <div class="tab active" data-tab="settings">&#9881;&#65039; Settings</div>
+  <div class="tab" data-tab="project">&#128214; Project Config</div>
+  <div class="tab" data-tab="goals">&#127919; Goals</div>
+  <div class="tab" data-tab="progress">&#128203; Live Progress</div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div class="content">
+<div class="panel active" id="panel-settings">
+
+  <!-- API Key Management -->
+  <div class="card">
+    <h3>&#128273; API Key Management</h3>
+    <div class="form-row">
+      <select id="keyName">
+        <option value="gemini_api_key">Gemini API Key</option>
+        <option value="deepseek_api_key">DeepSeek API Key</option>
+        <option value="anthropic_api_key">Anthropic (Claude) API Key</option>
+        <option value="openai_api_key">OpenAI API Key</option>
+        <option value="telegram_bot_token">Telegram Bot Token</option>
+      </select>
+      <input type="password" id="keyValue" placeholder="Paste your API key here...">
+      <button id="btnSaveKey">Save Key</button>
+    </div>
+    <p class="hint" style="margin-bottom:8px;">Keys are encrypted with AES-256-GCM and stored in the vault. Values are never displayed.</p>
+    <div style="margin-bottom:12px; padding:10px; background:#1a1a2e; border:1px dashed #0f3460; border-radius:6px;">
+      <p style="font-size:13px; color:#bdc3c7; margin-bottom:8px;"><strong>Can't paste?</strong> Put your keys in text files in the VM shared folder, then click Load:</p>
+      <p class="hint" style="margin-bottom:8px; font-size:12px;">
+        Expected files: <code>gemini_api_key.txt</code>, <code>telegram_bot_token.txt</code>, <code>deepseek_api_key.txt</code>, <code>anthropic_api_key.txt</code>, <code>openai_api_key.txt</code><br>
+        Or a single <code>key.txt</code> file will be loaded into the selected key above.
+      </p>
+      <button id="btnLoadFromFiles" style="background:#27ae60;font-size:13px;padding:6px 14px;">&#128194; Load Keys from Shared Folder</button>
+      <span id="loadKeysStatus" style="margin-left:10px;font-size:13px;color:#7f8c8d;"></span>
+    </div>
+    <div class="key-list" id="keyList"></div>
+  </div>
+
+  <!-- AI Providers -->
+  <div class="card">
+    <h3>&#129302; AI Providers</h3>
+    <div id="providerList"><span style="color:#7f8c8d">Loading...</span></div>
+    <div style="margin-top:10px;">
+      <button id="btnRefreshProviders" onclick="refreshProviders()" style="background:#2980b9;font-size:13px;padding:6px 14px;">&#128260; Refresh Providers</button>
+      <span id="refreshProviderStatus" style="margin-left:10px;font-size:13px;color:#7f8c8d;"></span>
+    </div>
+  </div>
+
+  <!-- Model Selection -->
+  <div class="card">
+    <h3>&#127919; Model Selection</h3>
+    <p class="hint" style="margin-bottom:12px;">Override the model name for each active provider. Leave blank to use the default.</p>
+    <div id="modelSelectionList"><span style="color:#7f8c8d">Loading providers...</span></div>
+  </div>
+
+  <!-- Budget Settings -->
+  <div class="card">
+    <h3>&#128176; Budget Settings</h3>
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Daily Limit ($)</label>
+        <input type="number" id="budgetDaily" step="0.01" min="0" placeholder="e.g. 5.00">
+      </div>
+      <div class="form-group">
+        <label>Monthly Limit ($)</label>
+        <input type="number" id="budgetMonthly" step="0.01" min="0" placeholder="e.g. 50.00">
+      </div>
+    </div>
+    <button id="btnSaveBudget">Save Budget</button>
+  </div>
+
+  <!-- Heartbeat Settings -->
+  <div class="card">
+    <h3>&#128147; Heartbeat Settings</h3>
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Interval (minutes)</label>
+        <input type="number" id="heartbeatInterval" min="1" max="1440" placeholder="e.g. 60">
+      </div>
+      <div class="form-group">
+        <label>Daily Word Goal</label>
+        <input type="number" id="heartbeatWordGoal" min="0" placeholder="e.g. 2000">
+      </div>
+    </div>
+    <div class="toggle-wrap" style="margin-bottom:12px;">
+      <label class="toggle">
+        <input type="checkbox" id="heartbeatReminders">
+        <span class="slider"></span>
+      </label>
+      <span style="font-size:14px;">Enable Reminders</span>
+    </div>
+    <button id="btnSaveHeartbeat">Save Heartbeat</button>
+  </div>
+
+  <!-- Telegram Bridge -->
+  <div class="card">
+    <h3>&#128225; Telegram Integration</h3>
+    <div id="telegramStatus" style="margin-bottom:12px;font-size:14px;">Loading...</div>
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Bot Token</label>
+        <div class="form-row" style="margin-bottom:0;">
+          <input type="password" id="telegramToken" placeholder="Save via API Keys above, or paste here to test">
+          <button class="secondary" id="btnTestTelegram">Test Token</button>
+        </div>
+        <p class="hint">Create a bot with @BotFather on Telegram. Save the token in API Keys above.</p>
+      </div>
+      <div class="form-group">
+        <label>Allowed User IDs</label>
+        <input type="text" id="telegramUsers" placeholder="Comma-separated, e.g. 123456789,987654321">
+        <p class="hint">Your Telegram user ID. Send /start to @userinfobot to get it.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+      <button class="success" id="btnConnectTelegram">Connect</button>
+      <button class="danger" id="btnDisconnectTelegram">Disconnect</button>
+      <button id="btnSaveTelegramUsers">Save Users</button>
+    </div>
+    <div id="telegramTestResult" class="test-result"></div>
+  </div>
+
+  <!-- Research Domains -->
+  <div class="card">
+    <h3>&#127760; Research Domains</h3>
+    <p class="hint" style="margin-bottom:8px;">Approved domains for AI research. One per line.</p>
+    <div class="form-group">
+      <textarea id="researchDomains" rows="5" placeholder="wikipedia.org&#10;arxiv.org&#10;docs.python.org"></textarea>
+    </div>
+    <button id="btnSaveDomains">Save Domains</button>
+  </div>
+
+  <!-- Skills Loaded -->
+  <div class="card">
+    <h3>&#128218; Skills Loaded</h3>
+    <div id="skillsInfo"><span style="color:#7f8c8d">Loading...</span></div>
+  </div>
+
+  <!-- Author OS Tools -->
+  <div class="card">
+    <h3>&#128295; Author OS Tools</h3>
+    <div id="authorOSInfo"><span style="color:#7f8c8d">Loading...</span></div>
+  </div>
+
+  <!-- Memory Management -->
+  <div class="card">
+    <h3>&#129504; Memory</h3>
+    <p class="hint" style="margin-bottom:10px;">AuthorClaw remembers conversations and project context across sessions. Reset memory for a clean slate.</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="btnResetMemory" style="background:#e67e22;font-size:13px;padding:6px 14px;">Reset Conversations</button>
+      <button id="btnFullResetMemory" class="danger" style="font-size:13px;padding:6px 14px;">Full Reset (wipe everything)</button>
+    </div>
+    <span id="memoryResetStatus" style="display:block;margin-top:8px;font-size:13px;color:#7f8c8d;"></span>
+  </div>
+
+  <!-- Test Connection -->
+  <div class="card">
+    <h3>&#128172; Test Connection</h3>
+    <button class="secondary" id="btnTestChat">Send Test Message</button>
+    <div class="test-result" id="testResult"></div>
+  </div>
+
+</div>
+
+<!-- PROJECT CONFIG TAB -->
+<div class="panel" id="panel-project">
+
+  <div class="card">
+    <h3>&#128214; Book Project Configuration</h3>
+    <p class="hint" style="margin-bottom:16px;">Configure your book project here instead of editing code. Saved as JSON to the server.</p>
+
+    <div class="form-group">
+      <label>Project Name</label>
+      <input type="text" id="projName" placeholder="e.g. OmegaClaw">
+    </div>
+
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Genre</label>
+        <select id="projGenre">
+          <option value="">-- Select Genre --</option>
+          <option value="Tech-Thriller">Tech-Thriller</option>
+          <option value="Fantasy">Fantasy</option>
+          <option value="Romance">Romance</option>
+          <option value="Sci-Fi">Sci-Fi</option>
+          <option value="Mystery">Mystery</option>
+          <option value="Horror">Horror</option>
+          <option value="Literary Fiction">Literary Fiction</option>
+          <option value="Nonfiction">Nonfiction</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>POV</label>
+        <select id="projPOV">
+          <option value="">-- Select POV --</option>
+          <option value="First Person">First Person</option>
+          <option value="Third Person Limited">Third Person Limited</option>
+          <option value="Third Person Omniscient">Third Person Omniscient</option>
+          <option value="Second Person">Second Person</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Logline</label>
+      <textarea id="projLogline" rows="3" placeholder="2-3 sentence hook for your story..."></textarea>
+    </div>
+
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Setting</label>
+        <input type="text" id="projSetting" placeholder="e.g. Near-future San Francisco">
+      </div>
+      <div class="form-group">
+        <label>Tone</label>
+        <input type="text" id="projTone" placeholder="e.g. Dark, propulsive, technically authentic">
+      </div>
+    </div>
+
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Tense</label>
+        <select id="projTense">
+          <option value="">-- Select Tense --</option>
+          <option value="Past">Past</option>
+          <option value="Present">Present</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Themes</label>
+        <input type="text" id="projThemes" placeholder="Comma separated, e.g. Identity, Power, Trust">
+      </div>
+    </div>
+
+    <div class="form-group-inline">
+      <div class="form-group">
+        <label>Target Chapters</label>
+        <input type="number" id="projChapters" min="1" max="200" value="25">
+      </div>
+      <div class="form-group">
+        <label>Target Words Per Chapter</label>
+        <input type="number" id="projWordsPerChapter" min="100" max="20000" value="3500">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Character Seed <span style="color:#7f8c8d">(optional)</span></label>
+      <textarea id="projCharacter" rows="4" placeholder="Protagonist description: name, age, background, motivation, conflict..."></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="success" id="btnSaveProject">Save Project Config</button>
+      <button class="secondary" id="btnLoadProject">Load From Server</button>
+    </div>
+    <div id="projectStatus" class="hint" style="margin-top:8px;"></div>
+  </div>
+
+</div>
+
+<!-- GOALS TAB -->
+<div class="panel" id="panel-goals">
+
+  <div class="card">
+    <h3>&#127919; Create a Goal</h3>
+    <p class="hint" style="margin-bottom:12px;">Tell AuthorClaw what you want to achieve. It will autonomously plan the steps, choose the right tools and prompts, and execute them.</p>
+
+    <div class="form-group">
+      <label>What do you want to accomplish?</label>
+      <textarea id="goalDescription" rows="3" placeholder="e.g. Plan a sci-fi novel about time travel, or Write marketing copy for my fantasy book, or Analyze my writing style from Chapter 1..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Goal Title <span style="color:#7f8c8d">(optional &mdash; auto-generated if blank)</span></label>
+      <input type="text" id="goalTitle" placeholder="e.g. Plan my time travel novel">
+    </div>
+    <button class="success" id="btnCreateGoal">Create Goal</button>
+    <p class="hint" style="margin-top:8px;">AuthorClaw will auto-detect the goal type and create a step-by-step plan.</p>
+  </div>
+
+  <div class="card">
+    <h3>&#128203; Goal Templates</h3>
+    <p class="hint" style="margin-bottom:12px;">Or choose a pre-built goal template:</p>
+    <div class="goal-templates-grid" id="goalTemplates"><span style="color:#7f8c8d">Loading templates...</span></div>
+  </div>
+
+  <div class="card">
+    <h3>&#128195; Active Goals</h3>
+    <div id="goalList"><span style="color:#7f8c8d">No goals yet. Create one above!</span></div>
+  </div>
+
+</div>
+
+<!-- PROGRESS TAB -->
+<div class="panel" id="panel-progress">
+
+  <div class="phase-banner" id="phaseBanner">
+    <div class="phase-name" id="phaseName">Waiting for Conductor...</div>
+    <div class="phase-step" id="phaseStep">Launch the conductor script to begin writing</div>
+    <div class="phase-model" id="phaseModel"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="value" id="wordCount">0</div>
+      <div class="label">Words Written</div>
+    </div>
+    <div class="stat">
+      <div class="value" id="chapterCount">0 / 25</div>
+      <div class="label">Chapters</div>
+    </div>
+    <div class="stat">
+      <div class="value" id="costDisplay">$0.00</div>
+      <div class="label">Total Cost</div>
+    </div>
+    <div class="stat">
+      <div class="value" id="elapsedTime">00:00:00</div>
+      <div class="label">Elapsed</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>&#128209; Word Count Progress</h3>
+    <div class="progress-bar">
+      <div class="progress-fill" id="wordBar" style="width:0%">0%</div>
+    </div>
+    <p class="hint" style="margin-top:6px;" id="wordTarget"></p>
+  </div>
+
+  <div class="card">
+    <h3>&#128214; Chapters</h3>
+    <div class="chapter-grid" id="chapterGrid"></div>
+    <div class="hint" style="margin-top:8px;">
+      <span style="color:#7f8c8d">&#9632;</span> Pending &nbsp;
+      <span style="color:#2980b9">&#9632;</span> Writing &nbsp;
+      <span style="color:#27ae60">&#9632;</span> Drafted &nbsp;
+      <span style="color:#8e44ad">&#9632;</span> Revised
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>&#128240; Director's Log</h3>
+    <div id="logEntries">
+      <div class="idle-message">
+        <h2>No activity yet</h2>
+        <p>Run <code>npx tsx scripts/book-conductor.ts</code> in the VM terminal to start.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="stop-section">
+    <button class="danger" id="btnStopConductor">Stop Conductor</button>
+    <p>To stop the conductor, close the conductor terminal or press Ctrl+C in it.</p>
+  </div>
+
+</div>
+</div>
+
+<script>
+// AuthorClaw Dashboard — fully self-contained inline JS
+
+// ── Toast ──
+function showToast(message, type) {
+  type = type || 'info';
+  var existing = document.querySelectorAll('.toast');
+  existing.forEach(function(t) { t.remove(); });
+  var toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 4000);
+}
+
+// ── Tab Switching ──
+var tabs = document.querySelectorAll('.tab');
+function switchTab(name) {
+  tabs.forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-tab') === name);
+  });
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+}
+tabs.forEach(function(t) {
+  t.addEventListener('click', function() { switchTab(t.getAttribute('data-tab')); });
+});
+
+// ── API Helpers ──
+var API = '';
+function api(method, path, body) {
+  var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(API + path, opts).then(function(res) {
+    if (!res.ok) {
+      return res.json().then(function(data) {
+        throw new Error(data.error || ('HTTP ' + res.status));
+      }).catch(function(parseErr) {
+        if (parseErr.message && !parseErr.message.startsWith('HTTP ')) throw parseErr;
+        throw new Error('HTTP ' + res.status + ' ' + res.statusText);
+      });
+    }
+    return res.json();
+  });
+}
+
+function esc(str) {
+  if (!str) return '';
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(String(str)));
+  return div.innerHTML;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SETTINGS TAB
+// ══════════════════════════════════════════════════════════════
+
+// ── Save Key ──
+document.getElementById('btnSaveKey').addEventListener('click', function() {
+  var key = document.getElementById('keyName').value;
+  var value = document.getElementById('keyValue').value;
+  if (!value) { showToast('Please enter an API key', 'error'); return; }
+  api('POST', '/api/vault', { key: key, value: value }).then(function(data) {
+    document.getElementById('keyValue').value = '';
+    loadKeys();
+    loadTelegramStatus();
+    // If providers were auto-refreshed (API key was stored), show it
+    if (data && data.refreshedProviders) {
+      showToast('Key saved! AI providers refreshed: ' + data.refreshedProviders.join(', '), 'success');
+    } else {
+      showToast('Key saved and encrypted!', 'success');
+    }
+    // Always reload status to pick up new providers
+    loadStatus();
+  }).catch(function(e) {
+    showToast('Failed to save key: ' + e.message, 'error');
+  });
+});
+
+// ── Refresh Providers ──
+function refreshProviders() {
+  var btn = document.getElementById('btnRefreshProviders');
+  var status = document.getElementById('refreshProviderStatus');
+  btn.disabled = true;
+  status.textContent = 'Scanning...';
+  status.style.color = '#f39c12';
+  api('POST', '/api/providers/refresh').then(function(data) {
+    btn.disabled = false;
+    if (data.providers && data.providers.length > 0) {
+      status.textContent = 'Found ' + data.providers.length + ' provider(s)!';
+      status.style.color = '#2ecc71';
+    } else {
+      status.textContent = 'No providers found. Add an API key above.';
+      status.style.color = '#e74c3c';
+    }
+    loadStatus();
+    setTimeout(function() { status.textContent = ''; }, 5000);
+  }).catch(function(e) {
+    btn.disabled = false;
+    status.textContent = 'Error: ' + e.message;
+    status.style.color = '#e74c3c';
+  });
+}
+
+// ── Load Keys from Shared Folder ──
+document.getElementById('btnLoadFromFiles').addEventListener('click', function() {
+  var btn = document.getElementById('btnLoadFromFiles');
+  var status = document.getElementById('loadKeysStatus');
+  var selectedKey = document.getElementById('keyName').value;
+  btn.disabled = true;
+  status.textContent = 'Scanning shared folder...';
+  status.style.color = '#f39c12';
+  api('POST', '/api/vault/load-from-files', { fallbackKeyName: selectedKey }).then(function(data) {
+    btn.disabled = false;
+    if (data.loaded && data.loaded.length > 0) {
+      status.textContent = 'Loaded: ' + data.loaded.join(', ');
+      status.style.color = '#2ecc71';
+      showToast('Loaded ' + data.loaded.length + ' key(s) from shared folder!', 'success');
+      loadKeys();
+      loadStatus();
+      loadTelegramStatus();
+    } else {
+      status.textContent = 'No key files found. Create .txt files in the shared folder.';
+      status.style.color = '#e74c3c';
+      showToast('No key files found in shared folder', 'info');
+    }
+    if (data.errors && data.errors.length > 0) {
+      console.error('Key file errors:', data.errors);
+    }
+    setTimeout(function() { status.textContent = ''; }, 8000);
+  }).catch(function(e) {
+    btn.disabled = false;
+    status.textContent = 'Error: ' + e.message;
+    status.style.color = '#e74c3c';
+  });
+});
+
+// ── Load Keys ──
+function loadKeys() {
+  api('GET', '/api/vault/keys').then(function(data) {
+    var el = document.getElementById('keyList');
+    if (!data.keys || data.keys.length === 0) {
+      el.innerHTML = '<span style="color:#7f8c8d">No keys stored yet</span>';
+      return;
+    }
+    el.innerHTML = '';
+    data.keys.forEach(function(k) {
+      var tag = document.createElement('div');
+      tag.className = 'key-tag';
+      tag.textContent = k + ' ';
+      var del = document.createElement('span');
+      del.className = 'del';
+      del.textContent = '\u00d7';
+      del.addEventListener('click', function() { deleteKey(k); });
+      tag.appendChild(del);
+      el.appendChild(tag);
+    });
+  }).catch(function(e) {
+    document.getElementById('keyList').innerHTML = '<span style="color:#e74c3c">Error: ' + esc(e.message) + '</span>';
+  });
+}
+
+function deleteKey(key) {
+  if (!confirm('Delete ' + key + '?')) return;
+  api('DELETE', '/api/vault/' + key).then(function() {
+    loadKeys(); loadStatus(); loadTelegramStatus();
+    showToast('Key deleted', 'info');
+  }).catch(function(e) {
+    showToast('Failed: ' + e.message, 'error');
+  });
+}
+
+// ── Load Status ──
+var lastProviders = [];
+function loadStatus() {
+  api('GET', '/api/status').then(function(data) {
+    document.getElementById('healthDot').className = 'status-dot ok';
+
+    // Providers
+    var pl = document.getElementById('providerList');
+    if (data.providers && data.providers.length > 0) {
+      lastProviders = data.providers;
+      pl.innerHTML = '';
+      data.providers.forEach(function(p) {
+        var div = document.createElement('div');
+        div.className = 'provider';
+        div.innerHTML = '<span>' + esc(p.name) + ' <span style="color:#7f8c8d">(' + esc(p.model) + ')</span></span>' +
+          '<span class="tier ' + esc(p.tier) + '">' + esc(p.tier.toUpperCase()) + '</span>';
+        pl.appendChild(div);
+      });
+      updateModelSelection(data.providers);
+    } else {
+      lastProviders = [];
+      pl.innerHTML = '<span style="color:#e74c3c">No providers active. Add an API key above.</span>';
+      document.getElementById('modelSelectionList').innerHTML = '<span style="color:#7f8c8d">No active providers.</span>';
+    }
+
+    // Skills
+    if (data.skills) {
+      document.getElementById('skillsInfo').innerHTML =
+        '<strong>' + esc(String(data.skills.total)) + '</strong> skills loaded (' + esc(String(data.skills.author)) + ' author-specific)';
+    }
+
+    // Budget fields
+    if (data.costs) {
+      var bd = document.getElementById('budgetDaily');
+      var bm = document.getElementById('budgetMonthly');
+      if (!bd.value && data.costs.dailyLimit) bd.value = data.costs.dailyLimit;
+      if (!bm.value && data.costs.monthlyLimit) bm.value = data.costs.monthlyLimit;
+    }
+
+    // Heartbeat fields
+    if (data.heartbeat) {
+      var hi = document.getElementById('heartbeatInterval');
+      var hw = document.getElementById('heartbeatWordGoal');
+      var hr = document.getElementById('heartbeatReminders');
+      if (!hi.value && data.heartbeat.intervalMinutes) hi.value = data.heartbeat.intervalMinutes;
+      if (!hw.value && data.heartbeat.dailyWordGoal) hw.value = data.heartbeat.dailyWordGoal;
+      if (data.heartbeat.remindersEnabled !== undefined) hr.checked = data.heartbeat.remindersEnabled;
+    }
+  }).catch(function(e) {
+    document.getElementById('healthDot').className = 'status-dot err';
+    document.getElementById('providerList').innerHTML = '<span style="color:#e74c3c">Cannot connect: ' + esc(e.message) + '</span>';
+  });
+}
+
+function loadConfig() {
+  api('GET', '/api/config').then(function(data) {
+    if (data.costs) {
+      var bd = document.getElementById('budgetDaily');
+      var bm = document.getElementById('budgetMonthly');
+      if (data.costs.dailyLimit !== undefined && !bd._userEdited) bd.value = data.costs.dailyLimit;
+      if (data.costs.monthlyLimit !== undefined && !bm._userEdited) bm.value = data.costs.monthlyLimit;
+    }
+    if (data.heartbeat) {
+      var hi = document.getElementById('heartbeatInterval');
+      var hw = document.getElementById('heartbeatWordGoal');
+      if (data.heartbeat.intervalMinutes !== undefined && !hi._userEdited) hi.value = data.heartbeat.intervalMinutes;
+      if (data.heartbeat.dailyWordGoal !== undefined && !hw._userEdited) hw.value = data.heartbeat.dailyWordGoal;
+    }
+  }).catch(function() {});
+}
+
+// ── Model Selection ──
+function updateModelSelection(providers) {
+  var el = document.getElementById('modelSelectionList');
+  if (!providers || providers.length === 0) { el.innerHTML = '<span style="color:#7f8c8d">No active providers.</span>'; return; }
+  el.innerHTML = '';
+  providers.forEach(function(p) {
+    var group = document.createElement('div');
+    group.className = 'form-group';
+    group.style.marginBottom = '10px';
+    var label = document.createElement('label');
+    label.textContent = p.name + ' model';
+    var input = document.createElement('input');
+    input.type = 'text'; input.value = p.model || '';
+    input.placeholder = 'e.g. ' + (p.model || 'model-name');
+    input.setAttribute('data-provider-id', p.id);
+    input.className = 'model-input';
+    group.appendChild(label); group.appendChild(input); el.appendChild(group);
+  });
+  var btn = document.createElement('button');
+  btn.textContent = 'Save Models';
+  btn.addEventListener('click', saveModels);
+  el.appendChild(btn);
+}
+
+function saveModels() {
+  var inputs = document.querySelectorAll('.model-input');
+  var promises = [];
+  inputs.forEach(function(input) {
+    var pid = input.getAttribute('data-provider-id');
+    var model = input.value.trim();
+    if (model) {
+      promises.push(api('POST', '/api/config/update', { path: 'ai.providers.' + pid + '.model', value: model }));
+    }
+  });
+  if (promises.length === 0) { showToast('No models to save', 'info'); return; }
+  Promise.all(promises).then(function() { showToast('Models saved!', 'success'); loadStatus(); })
+    .catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+}
+
+// ── Save Budget ──
+document.getElementById('btnSaveBudget').addEventListener('click', function() {
+  var daily = parseFloat(document.getElementById('budgetDaily').value);
+  var monthly = parseFloat(document.getElementById('budgetMonthly').value);
+  var promises = [];
+  if (!isNaN(daily)) promises.push(api('POST', '/api/config/update', { path: 'costs.dailyLimit', value: daily }));
+  if (!isNaN(monthly)) promises.push(api('POST', '/api/config/update', { path: 'costs.monthlyLimit', value: monthly }));
+  if (promises.length === 0) { showToast('Enter a budget value', 'error'); return; }
+  Promise.all(promises).then(function() { showToast('Budget saved!', 'success'); })
+    .catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+});
+
+// ── Save Heartbeat ──
+document.getElementById('btnSaveHeartbeat').addEventListener('click', function() {
+  var interval = parseInt(document.getElementById('heartbeatInterval').value);
+  var wordGoal = parseInt(document.getElementById('heartbeatWordGoal').value);
+  var reminders = document.getElementById('heartbeatReminders').checked;
+  var promises = [];
+  if (!isNaN(interval)) promises.push(api('POST', '/api/config/update', { path: 'heartbeat.intervalMinutes', value: interval }));
+  if (!isNaN(wordGoal)) promises.push(api('POST', '/api/config/update', { path: 'heartbeat.dailyWordGoal', value: wordGoal }));
+  promises.push(api('POST', '/api/config/update', { path: 'heartbeat.enableReminders', value: reminders }));
+  Promise.all(promises).then(function() { showToast('Heartbeat saved!', 'success'); })
+    .catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+});
+
+// ── Save Research Domains ──
+document.getElementById('btnSaveDomains').addEventListener('click', function() {
+  var raw = document.getElementById('researchDomains').value.trim();
+  var domains = raw ? raw.split('\n').map(function(d) { return d.trim(); }).filter(Boolean) : [];
+  api('POST', '/api/config/update', { path: 'security.researchDomains', value: domains }).then(function() {
+    showToast('Research domains saved!', 'success');
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+});
+
+// ── Test Chat ──
+document.getElementById('btnTestChat').addEventListener('click', function() {
+  var el = document.getElementById('testResult');
+  el.style.display = 'block'; el.textContent = 'Sending test message...';
+  api('POST', '/api/chat', { message: 'Hello, confirm you are AuthorClaw and ready to write.' }).then(function(data) {
+    el.textContent = data.response || 'No response received';
+  }).catch(function(e) { el.textContent = 'Error: ' + e.message; el.style.color = '#e74c3c'; });
+});
+
+// ══════════════════════════════════════════════════════════════
+// TELEGRAM INTEGRATION
+// ══════════════════════════════════════════════════════════════
+
+function loadTelegramStatus() {
+  api('GET', '/api/telegram/status').then(function(data) {
+    var el = document.getElementById('telegramStatus');
+    var parts = [];
+    if (data.connected) {
+      parts.push('<span style="color:#27ae60;font-weight:700;">Connected</span>');
+    } else if (data.hasToken) {
+      parts.push('<span style="color:#f39c12;font-weight:700;">Token stored but not connected</span>');
+    } else {
+      parts.push('<span style="color:#7f8c8d;">No bot token configured</span>');
+    }
+    if (data.allowedUsers && data.allowedUsers.length > 0) {
+      parts.push(' &mdash; ' + data.allowedUsers.length + ' allowed user(s)');
+    } else {
+      parts.push(' &mdash; <span style="color:#e74c3c;">No users allowed (default-deny)</span>');
+    }
+    el.innerHTML = parts.join('');
+
+    // Populate users field
+    var usersEl = document.getElementById('telegramUsers');
+    if (!usersEl._userEdited && data.allowedUsers && data.allowedUsers.length > 0) {
+      usersEl.value = data.allowedUsers.join(',');
+    }
+  }).catch(function() {
+    document.getElementById('telegramStatus').innerHTML = '<span style="color:#7f8c8d;">Could not load status</span>';
+  });
+}
+
+document.getElementById('btnTestTelegram').addEventListener('click', function() {
+  var el = document.getElementById('telegramTestResult');
+  el.style.display = 'block'; el.textContent = 'Testing token...'; el.style.color = '#e0e0e0';
+  var token = document.getElementById('telegramToken').value.trim();
+  var body = token ? { token: token } : {};
+  api('POST', '/api/telegram/test', body).then(function(data) {
+    el.textContent = 'Bot verified: @' + (data.bot.username || data.bot.name);
+    el.style.color = '#27ae60';
+  }).catch(function(e) {
+    el.textContent = 'Failed: ' + e.message;
+    el.style.color = '#e74c3c';
+  });
+});
+
+document.getElementById('btnConnectTelegram').addEventListener('click', function() {
+  api('POST', '/api/telegram/connect').then(function(data) {
+    showToast(data.message || 'Telegram connected!', 'success');
+    loadTelegramStatus();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnDisconnectTelegram').addEventListener('click', function() {
+  api('POST', '/api/telegram/disconnect').then(function() {
+    showToast('Telegram disconnected', 'info');
+    loadTelegramStatus();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnSaveTelegramUsers').addEventListener('click', function() {
+  var raw = document.getElementById('telegramUsers').value.trim();
+  var users = raw ? raw.split(',').map(function(u) { return u.trim(); }).filter(Boolean) : [];
+  api('POST', '/api/telegram/users', { users: users }).then(function() {
+    showToast('Telegram users saved!', 'success');
+    loadTelegramStatus();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+});
+
+// ── Author OS Tools ──
+function loadAuthorOS() {
+  api('GET', '/api/author-os/status').then(function(data) {
+    var el = document.getElementById('authorOSInfo');
+    if (!data.tools || data.tools.length === 0) {
+      el.innerHTML = '<span style="color:#7f8c8d;">No Author OS tools detected. Mount to ~/author-os.</span>';
+      return;
+    }
+    el.innerHTML = '';
+    data.tools.forEach(function(t) {
+      var div = document.createElement('div');
+      div.style.cssText = 'display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #0f3460;font-size:14px;';
+      div.innerHTML = '<span>' + esc(t.tool) + '</span>' +
+        (t.available ? '<span style="color:#27ae60;">Available</span>' : '<span style="color:#7f8c8d;">Not found</span>');
+      el.appendChild(div);
+    });
+  }).catch(function() {
+    document.getElementById('authorOSInfo').innerHTML = '<span style="color:#7f8c8d;">Could not load</span>';
+  });
+}
+
+// ── Memory Reset ──
+function doMemoryReset(full) {
+  var confirmMsg = full
+    ? 'This will wipe ALL memory including project data, book bible entries, and voice profiles. Are you sure?'
+    : 'This will clear conversation history and summaries. Project data will be preserved. Continue?';
+  if (!confirm(confirmMsg)) return;
+
+  var status = document.getElementById('memoryResetStatus');
+  status.textContent = 'Resetting...';
+  status.style.color = '#f39c12';
+
+  var url = full ? '/api/memory/reset?full=true' : '/api/memory/reset';
+  api('POST', url).then(function(data) {
+    if (data.cleared && data.cleared.length > 0) {
+      status.textContent = 'Cleared: ' + data.cleared.join(', ');
+      status.style.color = '#2ecc71';
+      showToast('Memory reset! Cleared: ' + data.cleared.join(', '), 'success');
+    } else {
+      status.textContent = 'Nothing to clear — memory was already empty.';
+      status.style.color = '#7f8c8d';
+    }
+    setTimeout(function() { status.textContent = ''; }, 6000);
+  }).catch(function(e) {
+    status.textContent = 'Error: ' + e.message;
+    status.style.color = '#e74c3c';
+  });
+}
+
+document.getElementById('btnResetMemory').addEventListener('click', function() { doMemoryReset(false); });
+document.getElementById('btnFullResetMemory').addEventListener('click', function() { doMemoryReset(true); });
+
+// ══════════════════════════════════════════════════════════════
+// PROJECT CONFIG TAB
+// ══════════════════════════════════════════════════════════════
+
+var projectFields = [
+  { id: 'projName', key: 'name' },
+  { id: 'projGenre', key: 'genre' },
+  { id: 'projLogline', key: 'logline' },
+  { id: 'projSetting', key: 'setting' },
+  { id: 'projTone', key: 'tone' },
+  { id: 'projPOV', key: 'pov' },
+  { id: 'projTense', key: 'tense' },
+  { id: 'projChapters', key: 'targetChapters', type: 'int' },
+  { id: 'projWordsPerChapter', key: 'targetWordsPerChapter', type: 'int' },
+  { id: 'projThemes', key: 'themes' },
+  { id: 'projCharacter', key: 'characterSeed' }
+];
+
+function getProjectData() {
+  var data = {};
+  projectFields.forEach(function(f) {
+    var el = document.getElementById(f.id);
+    var val = el.value;
+    if (f.type === 'int') val = parseInt(val) || 0;
+    if (val !== '' && val !== 0) data[f.key] = val;
+  });
+  return data;
+}
+
+function setProjectData(data) {
+  if (!data || typeof data !== 'object') return;
+  projectFields.forEach(function(f) {
+    var el = document.getElementById(f.id);
+    if (data[f.key] !== undefined && data[f.key] !== null) el.value = data[f.key];
+  });
+}
+
+document.getElementById('btnSaveProject').addEventListener('click', function() {
+  var data = getProjectData();
+  if (!data.name) { showToast('Project name is required', 'error'); return; }
+  var statusEl = document.getElementById('projectStatus');
+  statusEl.textContent = 'Saving...'; statusEl.style.color = '#f39c12';
+  api('POST', '/api/conductor/config', data).then(function() {
+    showToast('Project config saved!', 'success');
+    statusEl.textContent = 'Saved at ' + new Date().toLocaleTimeString();
+    statusEl.style.color = '#27ae60';
+  }).catch(function(e) {
+    showToast('Failed: ' + e.message, 'error');
+    statusEl.textContent = 'Error: ' + e.message; statusEl.style.color = '#e74c3c';
+  });
+});
+
+document.getElementById('btnLoadProject').addEventListener('click', function() { loadProjectConfig(); });
+
+function loadProjectConfig() {
+  var statusEl = document.getElementById('projectStatus');
+  statusEl.textContent = 'Loading...'; statusEl.style.color = '#f39c12';
+  api('GET', '/api/conductor/config').then(function(data) {
+    setProjectData(data);
+    statusEl.textContent = 'Loaded from server'; statusEl.style.color = '#27ae60';
+    showToast('Project config loaded', 'success');
+  }).catch(function(e) {
+    statusEl.textContent = 'No config found'; statusEl.style.color = '#7f8c8d';
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// GOALS TAB
+// ══════════════════════════════════════════════════════════════
+
+function loadGoalTemplates() {
+  api('GET', '/api/goals/templates').then(function(data) {
+    var el = document.getElementById('goalTemplates');
+    if (!data.templates || data.templates.length === 0) {
+      el.innerHTML = '<span style="color:#7f8c8d;">No templates available</span>';
+      return;
+    }
+    el.innerHTML = '';
+    data.templates.forEach(function(t) {
+      var card = document.createElement('div');
+      card.className = 'goal-template';
+      card.innerHTML = '<div class="gt-title">' + esc(t.label) + '</div>' +
+        '<div class="gt-desc">' + esc(t.description) + '</div>' +
+        '<div class="gt-steps">' + t.stepCount + ' steps</div>';
+      card.addEventListener('click', function() {
+        document.getElementById('goalDescription').value = t.description;
+        document.getElementById('goalTitle').value = t.label;
+        document.getElementById('goalDescription').focus();
+        showToast('Template loaded! Edit the description and click Create Goal.', 'info');
+        // Scroll to top of goals panel
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      el.appendChild(card);
+    });
+  }).catch(function() {
+    document.getElementById('goalTemplates').innerHTML = '<span style="color:#7f8c8d;">Could not load templates</span>';
+  });
+}
+
+document.getElementById('btnCreateGoal').addEventListener('click', function() {
+  var description = document.getElementById('goalDescription').value.trim();
+  if (!description) { showToast('Describe what you want to accomplish', 'error'); return; }
+  var title = document.getElementById('goalTitle').value.trim() || description.slice(0, 60);
+
+  api('POST', '/api/goals', { title: title, description: description }).then(function(data) {
+    showToast('Goal created with ' + data.goal.steps.length + ' steps!', 'success');
+    document.getElementById('goalDescription').value = '';
+    document.getElementById('goalTitle').value = '';
+    loadGoals();
+  }).catch(function(e) {
+    showToast('Failed: ' + e.message, 'error');
+  });
+});
+
+function loadGoals() {
+  api('GET', '/api/goals').then(function(data) {
+    var el = document.getElementById('goalList');
+    if (!data.goals || data.goals.length === 0) {
+      el.innerHTML = '<span style="color:#7f8c8d;">No goals yet. Create one above!</span>';
+      return;
+    }
+    el.innerHTML = '';
+    data.goals.forEach(function(g) {
+      var item = document.createElement('div');
+      item.className = 'goal-item';
+
+      // Header
+      var header = document.createElement('div');
+      header.className = 'gi-header';
+      header.innerHTML = '<span class="gi-title">' + esc(g.title) + '</span>' +
+        '<span class="gi-status ' + esc(g.status) + '">' + esc(g.status.toUpperCase()) + '</span>';
+      item.appendChild(header);
+
+      // Type
+      var typeEl = document.createElement('div');
+      typeEl.style.cssText = 'font-size:12px;color:#7f8c8d;margin-bottom:6px;';
+      typeEl.textContent = 'Type: ' + g.type + ' | ' + g.progress + '% complete';
+      item.appendChild(typeEl);
+
+      // Progress bar
+      var progressWrap = document.createElement('div');
+      progressWrap.className = 'gi-progress';
+      progressWrap.innerHTML = '<div class="progress-bar" style="height:16px;"><div class="progress-fill" style="width:' + g.progress + '%;font-size:11px;">' + g.progress + '%</div></div>';
+      item.appendChild(progressWrap);
+
+      // Steps
+      var stepList = document.createElement('div');
+      stepList.className = 'step-list';
+      g.steps.forEach(function(s) {
+        var stepItem = document.createElement('div');
+        stepItem.className = 'step-item';
+        stepItem.innerHTML = '<span class="step-dot ' + esc(s.status) + '"></span>' +
+          '<span>' + esc(s.label) + '</span>';
+        if (s.status === 'failed' && s.error) {
+          stepItem.innerHTML += '<span style="color:#e74c3c;font-size:11px;margin-left:auto;">' + esc(s.error.slice(0, 50)) + '</span>';
+        }
+        stepList.appendChild(stepItem);
+      });
+      item.appendChild(stepList);
+
+      // Actions
+      var actions = document.createElement('div');
+      actions.className = 'gi-actions';
+
+      if (g.status === 'pending') {
+        var startBtn = document.createElement('button');
+        startBtn.className = 'success'; startBtn.textContent = 'Start';
+        startBtn.addEventListener('click', function() { startGoal(g.id); });
+        actions.appendChild(startBtn);
+      }
+
+      if (g.status === 'active') {
+        var execBtn = document.createElement('button');
+        execBtn.textContent = 'Execute Next Step';
+        execBtn.addEventListener('click', function() { executeGoalStep(g.id); });
+        actions.appendChild(execBtn);
+
+        var pauseBtn = document.createElement('button');
+        pauseBtn.className = 'secondary'; pauseBtn.textContent = 'Pause';
+        pauseBtn.addEventListener('click', function() { pauseGoal(g.id); });
+        actions.appendChild(pauseBtn);
+
+        // Skip current step
+        var activeStep = g.steps.find(function(s) { return s.status === 'active'; });
+        if (activeStep) {
+          var skipBtn = document.createElement('button');
+          skipBtn.className = 'secondary'; skipBtn.textContent = 'Skip Step';
+          skipBtn.addEventListener('click', function() { skipGoalStep(g.id, activeStep.id); });
+          actions.appendChild(skipBtn);
+        }
+      }
+
+      if (g.status === 'paused') {
+        var resumeBtn = document.createElement('button');
+        resumeBtn.className = 'success'; resumeBtn.textContent = 'Resume';
+        resumeBtn.addEventListener('click', function() { startGoal(g.id); });
+        actions.appendChild(resumeBtn);
+      }
+
+      var deleteBtn = document.createElement('button');
+      deleteBtn.className = 'danger'; deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', function() { deleteGoal(g.id); });
+      actions.appendChild(deleteBtn);
+
+      item.appendChild(actions);
+      el.appendChild(item);
+    });
+  }).catch(function(e) {
+    document.getElementById('goalList').innerHTML = '<span style="color:#e74c3c;">Error: ' + esc(e.message) + '</span>';
+  });
+}
+
+function startGoal(id) {
+  api('POST', '/api/goals/' + id + '/start').then(function(data) {
+    showToast('Goal started! Click "Execute Next Step" to proceed.', 'success');
+    loadGoals();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+}
+
+function executeGoalStep(id) {
+  showToast('Executing step... this may take a moment.', 'info');
+  api('POST', '/api/goals/' + id + '/execute').then(function(data) {
+    if (data.success) {
+      if (data.nextStep) {
+        showToast('Step completed! Next: ' + data.nextStep.label, 'success');
+      } else {
+        showToast('Goal completed!', 'success');
+      }
+    } else {
+      showToast('Step failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+    loadGoals();
+  }).catch(function(e) {
+    showToast('Execution failed: ' + e.message, 'error');
+    loadGoals();
+  });
+}
+
+function pauseGoal(id) {
+  api('POST', '/api/goals/' + id + '/pause').then(function() {
+    showToast('Goal paused', 'info');
+    loadGoals();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+}
+
+function skipGoalStep(goalId, stepId) {
+  api('POST', '/api/goals/' + goalId + '/skip/' + stepId).then(function() {
+    showToast('Step skipped', 'info');
+    loadGoals();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+}
+
+function deleteGoal(id) {
+  if (!confirm('Delete this goal?')) return;
+  api('DELETE', '/api/goals/' + id).then(function() {
+    showToast('Goal deleted', 'info');
+    loadGoals();
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+}
+
+// ══════════════════════════════════════════════════════════════
+// PROGRESS TAB
+// ══════════════════════════════════════════════════════════════
+
+var totalChaptersConfig = 25;
+var conductorStartMs = 0;
+var lastConductorElapsedMs = 0;
+var elapsedTimerInterval = null;
+
+function initChapterGrid(total) {
+  total = total || totalChaptersConfig;
+  var grid = document.getElementById('chapterGrid');
+  grid.innerHTML = '';
+  for (var i = 1; i <= total; i++) {
+    var box = document.createElement('div');
+    box.className = 'chapter-box pending';
+    box.id = 'ch-' + i;
+    box.textContent = i;
+    grid.appendChild(box);
+  }
+}
+
+function fmtTime(ms) {
+  if (!ms || ms <= 0) return '00:00:00';
+  var s = Math.floor(ms / 1000);
+  var h = Math.floor(s / 3600);
+  var m = Math.floor((s % 3600) / 60);
+  var sec = s % 60;
+  return [h, m, sec].map(function(v) { return String(v).padStart(2, '0'); }).join(':');
+}
+
+function startElapsedTimer(baseMs) {
+  conductorStartMs = Date.now() - baseMs;
+  if (elapsedTimerInterval) clearInterval(elapsedTimerInterval);
+  elapsedTimerInterval = setInterval(function() {
+    document.getElementById('elapsedTime').textContent = fmtTime(Date.now() - conductorStartMs);
+  }, 1000);
+}
+
+function stopElapsedTimer() {
+  if (elapsedTimerInterval) { clearInterval(elapsedTimerInterval); elapsedTimerInterval = null; }
+}
+
+function pollProgress() {
+  api('GET', '/api/conductor/status').then(function(data) {
+    if (!data || data.phase === 'idle') { stopElapsedTimer(); return; }
+    var p = data.progress || {};
+
+    document.getElementById('phaseName').textContent = data.phase || 'Working...';
+    document.getElementById('phaseStep').textContent = data.step || '';
+
+    var modelText = '';
+    if (p.model) modelText = 'Model: ' + p.model;
+    else if (data.model) modelText = 'Model: ' + data.model;
+    document.getElementById('phaseModel').textContent = modelText;
+
+    var totalCh = p.totalChapters || totalChaptersConfig;
+    var targetWords = p.targetWords || (totalCh * (p.wordsPerChapter || 3500));
+
+    var wc = p.wordCount || 0;
+    document.getElementById('wordCount').textContent = wc.toLocaleString();
+    document.getElementById('chapterCount').textContent = (p.chaptersComplete || 0) + ' / ' + totalCh;
+    document.getElementById('costDisplay').textContent = '$' + (p.cost || 0).toFixed(2);
+
+    var serverElapsed = p.elapsedMs || 0;
+    if (serverElapsed > 0 && Math.abs(serverElapsed - lastConductorElapsedMs) > 2000) {
+      lastConductorElapsedMs = serverElapsed;
+      startElapsedTimer(serverElapsed);
+    } else if (serverElapsed === 0) {
+      stopElapsedTimer();
+      document.getElementById('elapsedTime').textContent = fmtTime(0);
+    }
+
+    var pct = Math.min(100, Math.round((wc / targetWords) * 100));
+    var bar = document.getElementById('wordBar');
+    bar.style.width = pct + '%';
+    bar.textContent = pct + '%';
+    document.getElementById('wordTarget').textContent = wc.toLocaleString() + ' / ' + targetWords.toLocaleString() + ' words (' + pct + '%)';
+
+    if (totalCh !== totalChaptersConfig) { totalChaptersConfig = totalCh; initChapterGrid(totalCh); }
+
+    var cc = p.chaptersComplete || 0;
+    var currentCh = p.currentChapter || 0;
+    for (var i = 1; i <= totalCh; i++) {
+      var box = document.getElementById('ch-' + i);
+      if (!box) continue;
+      var chData = p.chapters && p.chapters[i];
+      if (chData && chData.status === 'revised') { box.className = 'chapter-box revised'; }
+      else if (i <= cc) { box.className = 'chapter-box drafted'; }
+      else if (i === currentCh) { box.className = 'chapter-box writing'; }
+      else { box.className = 'chapter-box pending'; }
+    }
+
+    if (p.log && p.log.length > 0) {
+      var el = document.getElementById('logEntries');
+      el.innerHTML = '';
+      var entries = p.log.slice(-8).reverse();
+      entries.forEach(function(e) {
+        var entry = document.createElement('div');
+        entry.className = 'log-entry';
+        var timeHtml = '<span class="log-time">' + esc(e.timestamp || '') + '</span>';
+        if (e.phase) timeHtml += '<span class="log-phase">' + esc(e.phase) + '</span>';
+        var textHtml = '';
+        if (e.text) textHtml += '<div class="log-text">' + esc(e.text) + '</div>';
+        if (e.narration) textHtml += '<div class="log-narration">' + esc(e.narration) + '</div>';
+        if (!e.text && !e.narration && e.message) textHtml += '<div class="log-text">' + esc(e.message) + '</div>';
+        entry.innerHTML = timeHtml + textHtml;
+        el.appendChild(entry);
+      });
+    }
+  }).catch(function(e) {
+    var banner = document.getElementById('phaseStep');
+    if (banner && e.message.indexOf('Failed to fetch') !== -1) {
+      banner.textContent = 'Cannot reach server...';
+      document.getElementById('healthDot').className = 'status-dot err';
+    }
+  });
+}
+
+document.getElementById('btnStopConductor').addEventListener('click', function() {
+  showToast('To stop the conductor, close its terminal or press Ctrl+C.', 'info');
+});
+
+// ══════════════════════════════════════════════════════════════
+// UTILITIES & INIT
+// ══════════════════════════════════════════════════════════════
+
+['budgetDaily', 'budgetMonthly', 'heartbeatInterval', 'heartbeatWordGoal', 'researchDomains', 'telegramUsers'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('input', function() { el._userEdited = true; });
+});
+
+initChapterGrid(25);
+loadKeys();
+loadStatus();
+loadConfig();
+loadProjectConfig();
+loadTelegramStatus();
+loadGoalTemplates();
+loadGoals();
+loadAuthorOS();
+
+// Poll progress every 3s, status every 15s, goals every 10s
+setInterval(pollProgress, 3000);
+setInterval(loadStatus, 15000);
+setInterval(loadGoals, 10000);
+
+pollProgress();
+</script>
+</body>
+</html>
