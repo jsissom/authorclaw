@@ -27,6 +27,8 @@ if [ -d "$SHARED" ]; then
     --exclude 'workspace' \
     --exclude 'conductor-output' \
     --exclude 'config/.vault' \
+    --exclude 'config/user.json' \
+    --exclude 'logs' \
     "$SHARED/" "$HOME_DIR/"
   echo "  ✓ Code synced"
 else

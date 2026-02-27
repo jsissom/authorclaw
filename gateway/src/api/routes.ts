@@ -78,9 +78,17 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
     // Use 'conductor' channel when skipHistory is set (prevents chapter dumps in Telegram)
     const channel = skipHistory ? 'conductor' : 'api';
     let response = '';
-    await gateway.handleMessage(message, channel, (text: string) => {
-      response = text;
-    });
+    try {
+      await gateway.handleMessage(message, channel, (text: string) => {
+        response = text;
+      });
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      if (msg.includes('No AI providers')) {
+        return res.status(503).json({ error: 'No AI providers configured. Add an API key in Settings → API Keys.' });
+      }
+      return res.status(500).json({ error: 'AI error: ' + msg });
+    }
 
     res.json({ response });
   });
