@@ -128,6 +128,7 @@ export class TelegramBridge {
         `/research [topic] — Research a topic\n` +
         `/files — List files (numbered)\n` +
         `/read [# or name] — Read a file\n` +
+        `/export [# or name] — Export to Word/EPUB/PDF\n` +
         `/speak [text] — Text-to-speech voice\n` +
         `/stop — Stop everything\n` +
         `/stop goal — Stop goal only\n` +
@@ -365,6 +366,85 @@ export class TelegramBridge {
         } catch (e) {
           await this.sendMessage(chatId, `❌ ${String(e)}`);
         }
+      }
+      return;
+    }
+
+    // ── /export — Export manuscript files to Word/EPUB/PDF via Format Factory Pro ──
+    if (text.startsWith('/export')) {
+      const args = text.replace(/^\/export\s*/, '').trim();
+
+      // Show help if no arguments
+      if (!args) {
+        await this.sendMessage(chatId,
+          `📦 *Export your manuscript:*\n\n` +
+          `/export [file] — Export to all formats\n` +
+          `/export [file] docx — Word only\n` +
+          `/export [file] epub — EPUB only\n` +
+          `/export [file] pdf — PDF only\n\n` +
+          `Use /files first, then:\n` +
+          `/export 1 — Export file #1\n` +
+          `/export 3 docx — Export file #3 as Word\n\n` +
+          `Supported: docx, epub, pdf, html, rtf`);
+        return;
+      }
+
+      try {
+        // Check if Format Factory Pro is available
+        const statusRes = await fetch('http://localhost:3847/api/author-os/status');
+        const statusData = await statusRes.json() as any;
+        const ffAvailable = statusData.tools?.some((t: any) =>
+          (t.tool === 'format-factory' || t.tool === 'creator-asset-suite') && t.available
+        );
+
+        if (!ffAvailable) {
+          await this.sendMessage(chatId, `📦 Format Factory Pro is not installed on this server.\n\nInstall Author OS tools first, or use /files and download .md files directly.`);
+          return;
+        }
+
+        // Parse: /export [file_or_number] [format]
+        const parts = args.split(/\s+/);
+        let filename = parts[0];
+        const format = parts[1]?.toLowerCase() || 'all';
+
+        // Check if it's a number from the file picker
+        const num = parseInt(filename, 10);
+        if (!isNaN(num) && this.lastFileList && num >= 1 && num <= this.lastFileList.length) {
+          filename = this.lastFileList[num - 1];
+        }
+
+        // Derive title from filename
+        const title = filename.replace(/\.[^.]+$/, '')
+          .replace(/[-_]/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+
+        await this.sendMessage(chatId, `📦 Exporting "${filename}" as ${format === 'all' ? 'all formats' : format.toUpperCase()}...`);
+
+        const exportRes = await fetch('http://localhost:3847/api/author-os/format', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputFile: filename,
+            title,
+            formats: format === 'all' ? ['all'] : [format],
+          }),
+        });
+        const exportData = await exportRes.json() as any;
+
+        if (exportData.error) {
+          await this.sendMessage(chatId, `❌ ${exportData.error}`);
+        } else if (exportData.exitCode === 0) {
+          await this.sendMessage(chatId,
+            `✅ Export complete!\n\n` +
+            `📄 Output: workspace/exports/\n` +
+            `Use /files exports to see exported files.\n\n` +
+            (exportData.stdout ? `Output:\n${exportData.stdout.substring(0, 500)}` : ''));
+        } else {
+          await this.sendMessage(chatId,
+            `⚠️ Export finished with issues:\n${exportData.stderr?.substring(0, 500) || exportData.stdout?.substring(0, 500) || 'Unknown error'}`);
+        }
+      } catch (e) {
+        await this.sendMessage(chatId, `❌ Export error: ${String(e)}`);
       }
       return;
     }
