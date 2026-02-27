@@ -130,6 +130,7 @@ export class TelegramBridge {
         `/read [# or name] — Read a file\n` +
         `/export [# or name] — Export to Word/EPUB/PDF\n` +
         `/speak [text] — Text-to-speech voice\n` +
+        `/voice — List/change TTS voice\n` +
         `/stop — Stop everything\n` +
         `/stop goal — Stop goal only\n` +
         `/stop conductor — Stop conductor only\n\n` +
@@ -445,6 +446,67 @@ export class TelegramBridge {
         }
       } catch (e) {
         await this.sendMessage(chatId, `❌ Export error: ${String(e)}`);
+      }
+      return;
+    }
+
+    // ── /voice — List and change TTS voice ──
+    if (text.startsWith('/voice')) {
+      const input = text.replace(/^\/voice\s*/, '').trim();
+
+      try {
+        const voicesRes = await fetch('http://localhost:3847/api/audio/voices');
+        const voicesData = await voicesRes.json() as any;
+
+        if (!input) {
+          // List voices
+          let msg = `🎙️ *TTS Voices*\n\n`;
+          msg += `*Current:* ${voicesData.activeVoice || 'en_US-lessac-medium'}\n\n`;
+
+          if (voicesData.knownVoices) {
+            msg += `*Available voices:*\n`;
+            let num = 1;
+            for (const [name, desc] of Object.entries(voicesData.knownVoices)) {
+              const active = name === voicesData.activeVoice ? ' ← active' : '';
+              msg += `  ${num}. ${desc as string}${active}\n`;
+              num++;
+            }
+            msg += `\n💡 Set voice: /voice 1 or /voice en_US-lessac-high`;
+          }
+
+          if (!voicesData.available) {
+            msg += `\n\n⚠️ Piper TTS not installed. Run: pip3 install piper-tts`;
+          }
+          await this.sendMessage(chatId, msg);
+        } else {
+          // Set voice — by number or by name
+          let voiceName = input;
+
+          // Check if it's a number
+          const num = parseInt(input, 10);
+          if (!isNaN(num) && voicesData.knownVoices) {
+            const voiceNames = Object.keys(voicesData.knownVoices);
+            if (num >= 1 && num <= voiceNames.length) {
+              voiceName = voiceNames[num - 1];
+            }
+          }
+
+          const setRes = await fetch('http://localhost:3847/api/audio/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ voice: voiceName }),
+          });
+          const setData = await setRes.json() as any;
+
+          if (setData.success) {
+            const desc = voicesData.knownVoices?.[voiceName] || voiceName;
+            await this.sendMessage(chatId, `✅ Voice set to: ${desc}\n\nThis persists across restarts. Try it: /speak Hello, this is my new voice!`);
+          } else {
+            await this.sendMessage(chatId, `❌ ${setData.error || 'Failed to set voice'}`);
+          }
+        }
+      } catch (e) {
+        await this.sendMessage(chatId, `❌ Voice error: ${String(e)}`);
       }
       return;
     }

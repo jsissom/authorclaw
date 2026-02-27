@@ -1037,12 +1037,34 @@ ${sourceCode.substring(0, 15000)}
     createReadStream(filePath).pipe(res);
   });
 
-  // List available voices
+  // List available voices + known voices catalog
   app.get('/api/audio/voices', async (_req: Request, res: Response) => {
-    if (!services.tts?.isAvailable()) {
-      return res.json({ available: false, voices: [], install: 'pip3 install piper-tts' });
+    const { TTSService } = await import('../services/tts.js');
+    const installed = services.tts?.isAvailable() ? await services.tts.listVoices() : [];
+    const activeVoice = services.tts?.getActiveVoice() || 'en_US-lessac-medium';
+    res.json({
+      available: services.tts?.isAvailable() || false,
+      activeVoice,
+      installed,
+      knownVoices: TTSService.KNOWN_VOICES,
+      install: services.tts?.isAvailable() ? undefined : 'pip3 install piper-tts',
+    });
+  });
+
+  // Get/set the active voice
+  app.get('/api/audio/voice', async (_req: Request, res: Response) => {
+    res.json({ voice: services.tts?.getActiveVoice() || 'en_US-lessac-medium' });
+  });
+
+  app.post('/api/audio/voice', async (req: Request, res: Response) => {
+    const { voice } = req.body;
+    if (!voice || typeof voice !== 'string') {
+      return res.status(400).json({ error: 'voice is required (e.g., "en_US-lessac-medium")' });
     }
-    const voices = await services.tts.listVoices();
-    res.json({ available: true, voices });
+    if (!services.tts) {
+      return res.status(503).json({ error: 'TTS service not initialized' });
+    }
+    await services.tts.setVoice(voice);
+    res.json({ success: true, voice, message: `Voice set to ${voice}. This persists across restarts.` });
   });
 }

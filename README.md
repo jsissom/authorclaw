@@ -277,6 +277,84 @@ AuthorClaw security features:
 
 ---
 
+## Deployment — Defense in Depth
+
+> **We strongly recommend running AuthorClaw inside a VM or VPS with Docker.** Your API keys, manuscripts, and creative work deserve real protection. Defense in depth means multiple security layers — not just application-level security.
+
+### Recommended: VPS + Docker + VPN (Best Security)
+
+This is the gold standard for always-on, secure operation:
+
+1. **Rent a VPS** ($5-6/month) — Hetzner, DigitalOcean, or Linode
+2. **Install Docker** — containerizes AuthorClaw with strict resource limits
+3. **Install Tailscale** — free mesh VPN, no public ports exposed
+4. **Deploy AuthorClaw** — `docker compose up -d`
+
+```bash
+# On your VPS:
+curl -fsSL https://get.docker.com | sh
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up
+
+# Clone and deploy:
+git clone https://github.com/Ckokoski/authorclaw.git
+cd authorclaw/docker
+docker compose up -d
+```
+
+**Why this matters:**
+- VPS isolates AuthorClaw from your personal machine
+- Docker containers limit file access and resource usage
+- Tailscale VPN means zero public ports — only your devices can connect
+- Telegram works 24/7 even when your computer is off
+- Your manuscripts and API keys never leave the VPS
+
+### Alternative: Local VM (Good Security)
+
+If you prefer running locally:
+
+1. **VirtualBox/UTM** — free VM software
+2. **Ubuntu 24.04** — lightweight Linux inside the VM
+3. **Run AuthorClaw natively** or with Docker inside the VM
+
+```bash
+# In your VM:
+bash /media/sf_authorclaw-transfer/run.sh
+```
+
+**Why a VM helps:**
+- Isolates AuthorClaw from your host OS
+- If something goes wrong, the VM is disposable
+- Shared folders let you copy files in/out safely
+- Snapshots let you roll back to a known-good state
+
+### Minimum: Local Development (Acceptable)
+
+Running directly on your machine works fine for development and testing:
+
+```bash
+git clone https://github.com/Ckokoski/authorclaw.git
+cd authorclaw && npm install
+npx tsx gateway/src/index.ts
+```
+
+AuthorClaw binds to `localhost:3847` only — not exposed to the internet. But your API keys and manuscripts live on your main OS with no isolation layer.
+
+### Security Layers Summary
+
+| Layer | Local | VM | VPS + Docker + VPN |
+|-------|-------|-----|-------------------|
+| App-level vault (AES-256) | ✅ | ✅ | ✅ |
+| Sandbox file access | ✅ | ✅ | ✅ |
+| Audit logging | ✅ | ✅ | ✅ |
+| OS isolation | ❌ | ✅ | ✅ |
+| Container isolation | ❌ | Optional | ✅ |
+| Network isolation (VPN) | ❌ | ❌ | ✅ |
+| Always-on (Telegram 24/7) | ❌ | ❌ | ✅ |
+| Disposable environment | ❌ | ✅ | ✅ |
+
+---
+
 ## Setup Wizard
 
 For a guided setup experience, run the interactive wizard:

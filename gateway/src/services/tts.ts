@@ -32,17 +32,36 @@ export interface TTSVoice {
 
 export class TTSService {
   private audioDir: string;
+  private configDir: string;
   private piperAvailable: boolean | null = null;
   private ffmpegAvailable: boolean | null = null;
   private defaultVoice = 'en_US-lessac-medium';
+  private configuredVoice: string | null = null;
+
+  // Known good Piper voices with human-readable descriptions
+  static readonly KNOWN_VOICES: Record<string, string> = {
+    'en_US-lessac-medium': 'Lessac (US, clear & natural — recommended)',
+    'en_US-lessac-high': 'Lessac High (US, best quality, slower)',
+    'en_US-libritts-high': 'LibriTTS (US, expressive, great for fiction)',
+    'en_US-amy-medium': 'Amy (US, warm female voice)',
+    'en_US-arctic-medium': 'Arctic (US, neutral)',
+    'en_US-ryan-medium': 'Ryan (US, male)',
+    'en_GB-alba-medium': 'Alba (British, clear)',
+    'en_GB-jenny_dioco-medium': 'Jenny (British, warm)',
+  };
 
   constructor(workspaceDir: string) {
     this.audioDir = join(workspaceDir, 'audio');
+    this.configDir = join(workspaceDir, '.config');
   }
 
   async initialize(): Promise<void> {
     // Create audio output directory
     await mkdir(this.audioDir, { recursive: true });
+    await mkdir(this.configDir, { recursive: true });
+
+    // Load persisted voice preference
+    await this.loadVoiceConfig();
 
     // Check if Piper TTS is installed
     this.piperAvailable = await this.checkCommand('piper --help');
@@ -51,10 +70,36 @@ export class TTSService {
     this.ffmpegAvailable = await this.checkCommand('ffmpeg -version');
 
     if (this.piperAvailable) {
-      console.log('  🔊 TTS: Piper TTS available');
+      const voiceName = this.configuredVoice || this.defaultVoice;
+      console.log(`  🔊 TTS: Piper TTS available (voice: ${voiceName})`);
     } else {
       console.log('  🔇 TTS: Piper not installed (install with: pip3 install piper-tts)');
     }
+  }
+
+  /** Load persisted voice config from workspace/.config/tts.json */
+  private async loadVoiceConfig(): Promise<void> {
+    const configPath = join(this.configDir, 'tts.json');
+    try {
+      const raw = await readFile(configPath, 'utf-8');
+      const config = JSON.parse(raw);
+      if (config.voice && typeof config.voice === 'string') {
+        this.configuredVoice = config.voice;
+      }
+    } catch { /* no config yet — use default */ }
+  }
+
+  /** Persist voice preference to workspace/.config/tts.json */
+  async setVoice(voice: string): Promise<void> {
+    this.configuredVoice = voice;
+    const configPath = join(this.configDir, 'tts.json');
+    const { writeFile } = await import('fs/promises');
+    await writeFile(configPath, JSON.stringify({ voice }, null, 2));
+  }
+
+  /** Get the currently active voice (configured or default) */
+  getActiveVoice(): string {
+    return this.configuredVoice || this.defaultVoice;
   }
 
   private async checkCommand(cmd: string): Promise<boolean> {
@@ -85,7 +130,7 @@ export class TTSService {
       };
     }
 
-    const voice = options.voice || this.defaultVoice;
+    const voice = options.voice || this.configuredVoice || this.defaultVoice;
     const format = options.format || 'wav';
     const id = randomBytes(6).toString('hex');
     const wavFile = join(this.audioDir, `tts-${id}.wav`);
