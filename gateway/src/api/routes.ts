@@ -697,14 +697,27 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
     const { existsSync: ex } = await import('fs');
 
     const workspaceDir = j(baseDir, 'workspace');
-    const resolvedInput = r(workspaceDir, inputFile);
-    const resolvedOutput = r(workspaceDir, outputDir || 'exports');
+    const conductorDir = j(baseDir, 'conductor-output');
 
-    if (!resolvedInput.startsWith(r(workspaceDir))) {
-      return res.status(403).json({ error: 'Input file must be within workspace' });
+    // Search for the file in workspace first, then conductor-output
+    let resolvedInput = r(workspaceDir, inputFile);
+    if (!ex(resolvedInput)) {
+      // Try conductor-output directory
+      resolvedInput = r(conductorDir, inputFile);
     }
     if (!ex(resolvedInput)) {
-      return res.status(404).json({ error: 'Input file not found: ' + inputFile });
+      // Try as absolute path from baseDir
+      resolvedInput = r(baseDir, inputFile);
+    }
+    const resolvedOutput = r(workspaceDir, outputDir || 'exports');
+
+    // Security: must be within workspace OR conductor-output
+    const resolvedBase = r(baseDir);
+    if (!resolvedInput.startsWith(resolvedBase)) {
+      return res.status(403).json({ error: 'Input file must be within the AuthorClaw directory' });
+    }
+    if (!ex(resolvedInput)) {
+      return res.status(404).json({ error: 'Input file not found: ' + inputFile + '. Use /files to see available files.' });
     }
 
     const result = await services.authorOS.runFormatFactory(

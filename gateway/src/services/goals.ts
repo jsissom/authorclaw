@@ -443,13 +443,16 @@ ${toolList}
 ${validTaskTypes}
 
 ## Rules
-1. Create 3-15 steps depending on complexity
-2. Each step should be a single, focused task
-3. Reference specific skills by name when relevant
-4. Use appropriate taskType for each step (affects which AI model is used)
-5. Each step's prompt should be detailed enough to execute standalone
-6. Later steps should reference earlier work naturally (e.g., "Using the characters we developed...")
-7. For a full novel, include ALL phases: premise → characters → world → outline → chapters → revision → assembly
+1. Match step count to task complexity:
+   - Simple tasks (write a blurb, intro, scene, short piece): 1-2 steps
+   - Medium tasks (outline a story, research a topic, analyze style): 3-5 steps
+   - Large tasks (write a full novel/book): 7-15 steps with ALL phases
+2. ONLY plan full novel pipelines (premise → characters → world → outline → chapters → revision → assembly) when the user EXPLICITLY asks for a novel, book, or full manuscript
+3. Each step should be a single, focused task
+4. Reference specific skills by name when relevant
+5. Use appropriate taskType for each step (affects which AI model is used)
+6. Each step's prompt should be detailed enough to execute standalone
+7. Later steps should reference earlier work naturally (e.g., "Using the characters we developed...")
 
 ## Output Format
 Return ONLY valid JSON, no markdown fences, no explanation:
