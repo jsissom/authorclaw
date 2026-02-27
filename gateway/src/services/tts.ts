@@ -7,7 +7,7 @@
  */
 
 import { exec } from 'child_process';
-import { mkdir, readdir, stat, readFile, unlink } from 'fs/promises';
+import { mkdir, readdir, stat, readFile, unlink, access, constants } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -104,35 +104,49 @@ export class TTSService {
   /**
    * Search a list of candidate paths for a binary.
    * Returns the first working path, or '' if none found.
+   *
+   * Strategy for absolute paths: check exists + executable permission.
+   * Many CLI tools (like piper-tts) exit non-zero on --help, so we
+   * don't require the test command to succeed for known file paths.
    */
   private async findBinary(candidates: string[], testArg: string): Promise<string> {
     for (const candidate of candidates) {
       // Skip __main__.py style paths — need python invocation
       if (candidate.endsWith('.py')) {
         try {
-          await execAsync(`python3 "${candidate}" ${testArg}`, { timeout: 10000 });
+          await access(candidate, constants.X_OK);
           return `python3 "${candidate}"`;
         } catch { continue; }
       }
-      // Check if the file exists on disk first (fast check for absolute paths)
-      if (candidate.startsWith('/') || candidate.startsWith(process.env.HOME || '')) {
-        if (!existsSync(candidate)) continue;
+
+      const isAbsolute = candidate.startsWith('/') || candidate.startsWith(process.env.HOME || '/nope');
+
+      if (isAbsolute) {
+        // For absolute paths: just verify the file exists and is executable
+        // Don't require --help to succeed (piper-tts exits non-zero on --help)
+        try {
+          await access(candidate, constants.X_OK);
+          console.log(`    ✓ Found binary: ${candidate}`);
+          return candidate;
+        } catch { continue; }
+      } else {
+        // For bare command names (e.g. "piper", "ffmpeg"): try running it
+        try {
+          await execAsync(`${candidate} ${testArg}`, { timeout: 10000 });
+          return candidate;
+        } catch { continue; }
       }
-      // Try running it
-      try {
-        await execAsync(`"${candidate}" ${testArg}`, { timeout: 10000 });
-        return candidate;
-      } catch { continue; }
     }
+
     // Last resort: try `which` / `command -v` (catches anything on extended PATH)
     try {
       const { stdout } = await execAsync(`which ${candidates[0]} 2>/dev/null || command -v ${candidates[0]} 2>/dev/null`, { timeout: 5000 });
       const found = stdout.trim();
       if (found) {
         try {
-          await execAsync(`"${found}" ${testArg}`, { timeout: 10000 });
+          await access(found, constants.X_OK);
           return found;
-        } catch { /* found but won't run */ }
+        } catch { /* found but not executable */ }
       }
     } catch { /* which/command not available */ }
     return '';
