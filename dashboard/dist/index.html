@@ -334,15 +334,18 @@
       <button id="btnSaveKey">Save Key</button>
     </div>
     <p class="hint" style="margin-bottom:8px;">Keys are encrypted with AES-256-GCM and stored in the vault. Values are never displayed.</p>
-    <div style="margin-bottom:12px; padding:10px; background:#1a1a2e; border:1px dashed #0f3460; border-radius:6px;">
-      <p style="font-size:13px; color:#bdc3c7; margin-bottom:8px;"><strong>Can't paste?</strong> Put your keys in text files in the VM shared folder, then click Load:</p>
-      <p class="hint" style="margin-bottom:8px; font-size:12px;">
-        Expected files: <code>gemini_api_key.txt</code>, <code>telegram_bot_token.txt</code>, <code>deepseek_api_key.txt</code>, <code>anthropic_api_key.txt</code>, <code>openai_api_key.txt</code><br>
-        Or a single <code>key.txt</code> file will be loaded into the selected key above.
-      </p>
-      <button id="btnLoadFromFiles" style="background:#27ae60;font-size:13px;padding:6px 14px;">&#128194; Load Keys from Shared Folder</button>
-      <span id="loadKeysStatus" style="margin-left:10px;font-size:13px;color:#7f8c8d;"></span>
-    </div>
+    <details style="margin-bottom:12px;">
+      <summary style="cursor:pointer;font-size:13px;color:#7f8c8d;user-select:none;">Advanced: Load keys from files</summary>
+      <div style="margin-top:8px; padding:10px; background:#1a1a2e; border:1px dashed #0f3460; border-radius:6px;">
+        <p style="font-size:13px; color:#bdc3c7; margin-bottom:8px;"><strong>Can't paste?</strong> Place your API keys in text files, then click Load:</p>
+        <p class="hint" style="margin-bottom:8px; font-size:12px;">
+          Expected files: <code>gemini_api_key.txt</code>, <code>telegram_bot_token.txt</code>, <code>deepseek_api_key.txt</code>, <code>anthropic_api_key.txt</code>, <code>openai_api_key.txt</code><br>
+          Or a single <code>key.txt</code> file will be loaded into the selected key above.
+        </p>
+        <button id="btnLoadFromFiles" style="background:#27ae60;font-size:13px;padding:6px 14px;">&#128194; Load Keys from Files</button>
+        <span id="loadKeysStatus" style="margin-left:10px;font-size:13px;color:#7f8c8d;"></span>
+      </div>
+    </details>
     <div class="key-list" id="keyList"></div>
   </div>
 
@@ -672,27 +675,27 @@ function refreshProviders() {
   });
 }
 
-// ── Load Keys from Shared Folder ──
+// ── Load Keys from Files ──
 document.getElementById('btnLoadFromFiles').addEventListener('click', function() {
   var btn = document.getElementById('btnLoadFromFiles');
   var status = document.getElementById('loadKeysStatus');
   var selectedKey = document.getElementById('keyName').value;
   btn.disabled = true;
-  status.textContent = 'Scanning shared folder...';
+  status.textContent = 'Scanning for key files...';
   status.style.color = '#f39c12';
   api('POST', '/api/vault/load-from-files', { fallbackKeyName: selectedKey }).then(function(data) {
     btn.disabled = false;
     if (data.loaded && data.loaded.length > 0) {
       status.textContent = 'Loaded: ' + data.loaded.join(', ');
       status.style.color = '#2ecc71';
-      showToast('Loaded ' + data.loaded.length + ' key(s) from shared folder!', 'success');
+      showToast('Loaded ' + data.loaded.length + ' key(s) from files!', 'success');
       loadKeys();
       loadStatus();
       loadTelegramStatus();
     } else {
-      status.textContent = 'No key files found. Create .txt files in the shared folder.';
+      status.textContent = 'No key files found. Create .txt files in the config directory.';
       status.style.color = '#e74c3c';
-      showToast('No key files found in shared folder', 'info');
+      showToast('No key files found', 'info');
     }
     if (data.errors && data.errors.length > 0) {
       console.error('Key file errors:', data.errors);
