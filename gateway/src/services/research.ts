@@ -115,91 +115,138 @@ export class ResearchGate {
   }
 
   /**
-   * Search the web using DuckDuckGo Lite (no API key needed).
+   * Search for research content using multiple free APIs.
+   * Primary: Wikipedia API (always works, no CAPTCHA, great for author research).
+   * Also searches Google Books for book-related queries.
    * Results are filtered through the domain allowlist.
    */
   async search(query: string, maxResults: number = 5): Promise<{
-    results: Array<{ title: string; url: string; snippet: string }>;
+    results: Array<{ title: string; url: string; snippet: string; source?: string }>;
     blocked: Array<{ url: string; reason: string }>;
+    error?: string;
   }> {
     if (!this.checkRateLimit()) {
-      return { results: [], blocked: [{ url: '', reason: 'Rate limit exceeded' }] };
+      return { results: [], blocked: [], error: 'Rate limit exceeded (60/hour). Try again later.' };
     }
 
     await this.audit.log('research', 'search', { query, maxResults });
 
-    const allResults: Array<{ title: string; url: string; snippet: string }> = [];
+    const allResults: Array<{ title: string; url: string; snippet: string; source?: string }> = [];
     const blocked: Array<{ url: string; reason: string }> = [];
+    const errors: string[] = [];
 
+    // Search Wikipedia (primary — always works, most useful for author research)
     try {
-      const encodedQuery = encodeURIComponent(query);
-      const searchUrl = `https://lite.duckduckgo.com/lite/?q=${encodedQuery}`;
-
-      const response = await globalThis.fetch(searchUrl, {
-        headers: {
-          'User-Agent': 'AuthorClaw-Research/1.0',
-          'Accept': 'text/html',
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-      const html = await response.text();
-
-      // Parse DuckDuckGo Lite results
-      // Results are in table rows with class="result-link" and "result-snippet"
-      const linkPattern = /<a[^>]+class="result-link"[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
-      const snippetPattern = /<td[^>]+class="result-snippet"[^>]*>([\s\S]*?)<\/td>/gi;
-
-      const links: Array<{ url: string; title: string }> = [];
-      let linkMatch;
-      while ((linkMatch = linkPattern.exec(html)) !== null) {
-        links.push({ url: linkMatch[1], title: linkMatch[2].trim() });
-      }
-
-      const snippets: string[] = [];
-      let snippetMatch;
-      while ((snippetMatch = snippetPattern.exec(html)) !== null) {
-        snippets.push(snippetMatch[1].replace(/<[^>]+>/g, '').trim());
-      }
-
-      // If DuckDuckGo Lite format changed, try a simpler pattern
-      if (links.length === 0) {
-        const altPattern = /<a[^>]+href="(https?:\/\/[^"]+)"[^>]*>([^<]{5,})<\/a>/gi;
-        let altMatch;
-        const seenUrls = new Set<string>();
-        while ((altMatch = altPattern.exec(html)) !== null) {
-          const url = altMatch[1];
-          if (!url.includes('duckduckgo.com') && !seenUrls.has(url)) {
-            seenUrls.add(url);
-            links.push({ url, title: altMatch[2].trim() });
-          }
-        }
-      }
-
-      // Filter through allowlist
-      for (let i = 0; i < links.length && allResults.length < maxResults; i++) {
-        const link = links[i];
-        if (this.isAllowed(link.url)) {
-          allResults.push({
-            title: link.title,
-            url: link.url,
-            snippet: snippets[i] || '',
-          });
+      const wikiResults = await this.searchWikipedia(query, maxResults);
+      for (const r of wikiResults) {
+        if (this.isAllowed(r.url)) {
+          allResults.push(r);
         } else {
-          blocked.push({ url: link.url, reason: 'Domain not on allowlist' });
+          blocked.push({ url: r.url, reason: 'Domain not on allowlist' });
         }
       }
-
-      await this.audit.log('research', 'search_complete', {
-        query,
-        found: links.length,
-        allowed: allResults.length,
-        blocked: blocked.length,
-      });
     } catch (error) {
-      await this.audit.log('research', 'search_error', { query, error: String(error) });
+      errors.push('Wikipedia: ' + String(error));
     }
 
-    return { results: allResults, blocked };
+    // Search Google Books if we need more results and it's on the allowlist
+    if (allResults.length < maxResults) {
+      try {
+        const bookResults = await this.searchGoogleBooks(query, maxResults - allResults.length);
+        for (const r of bookResults) {
+          if (this.isAllowed(r.url)) {
+            allResults.push(r);
+          } else {
+            blocked.push({ url: r.url, reason: 'Domain not on allowlist' });
+          }
+        }
+      } catch (error) {
+        errors.push('Google Books: ' + String(error));
+      }
+    }
+
+    await this.audit.log('research', 'search_complete', {
+      query,
+      found: allResults.length + blocked.length,
+      allowed: allResults.length,
+      blocked: blocked.length,
+      sources: ['wikipedia', 'google-books'],
+    });
+
+    return {
+      results: allResults.slice(0, maxResults),
+      blocked,
+      error: allResults.length === 0 && errors.length > 0
+        ? 'Search errors: ' + errors.join('; ')
+        : undefined,
+    };
+  }
+
+  /**
+   * Search Wikipedia using the MediaWiki API.
+   * Free, no API key, no CAPTCHA, returns titles + snippets.
+   */
+  private async searchWikipedia(query: string, limit: number): Promise<
+    Array<{ title: string; url: string; snippet: string; source: string }>
+  > {
+    const params = new URLSearchParams({
+      action: 'query',
+      list: 'search',
+      srsearch: query,
+      format: 'json',
+      srlimit: String(Math.min(limit, 10)),
+      srprop: 'snippet|titlesnippet',
+      origin: '*',
+    });
+
+    const response = await globalThis.fetch(
+      `https://en.wikipedia.org/w/api.php?${params}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const data = await response.json() as any;
+
+    if (!data.query?.search) return [];
+
+    return data.query.search.map((item: any) => ({
+      title: item.title,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
+      snippet: (item.snippet || '').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+      source: 'Wikipedia',
+    }));
+  }
+
+  /**
+   * Search Google Books API (free, no key required for basic search).
+   * Returns books related to the query.
+   */
+  private async searchGoogleBooks(query: string, limit: number): Promise<
+    Array<{ title: string; url: string; snippet: string; source: string }>
+  > {
+    const params = new URLSearchParams({
+      q: query,
+      maxResults: String(Math.min(limit, 5)),
+      printType: 'books',
+      orderBy: 'relevance',
+    });
+
+    const response = await globalThis.fetch(
+      `https://www.googleapis.com/books/v1/volumes?${params}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    const data = await response.json() as any;
+
+    if (!data.items) return [];
+
+    return data.items.map((item: any) => {
+      const info = item.volumeInfo || {};
+      const authors = info.authors ? info.authors.join(', ') : 'Unknown';
+      return {
+        title: `${info.title || 'Untitled'} — by ${authors}`,
+        url: info.infoLink || `https://books.google.com/books?id=${item.id}`,
+        snippet: (info.description || '').substring(0, 300),
+        source: 'Google Books',
+      };
+    });
   }
 
   /**

@@ -1142,6 +1142,16 @@ ${sourceCode.substring(0, 15000)}
       // Search
       const searchResults = await research.search(query, maxResults || 5);
 
+      // If search returned an error, pass it through
+      if (searchResults.error && searchResults.results.length === 0) {
+        return res.json({
+          results: [],
+          blocked: searchResults.blocked,
+          totalFound: 0,
+          error: searchResults.error,
+        });
+      }
+
       // Fetch and extract top 3 allowed results
       const enriched = await Promise.all(
         searchResults.results.slice(0, 3).map(async (r: any) => {
@@ -1159,6 +1169,7 @@ ${sourceCode.substring(0, 15000)}
         results: enriched,
         blocked: searchResults.blocked,
         totalFound: searchResults.results.length,
+        error: searchResults.error,
       });
     } catch (error) {
       res.status(500).json({ error: 'Research failed: ' + String(error) });
