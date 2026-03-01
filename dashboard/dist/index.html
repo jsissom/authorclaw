@@ -894,6 +894,10 @@ document.getElementById('btnSaveDomains').addEventListener('click', function() {
   var domains = raw ? raw.split('\n').map(function(d) { return d.trim(); }).filter(Boolean) : [];
   api('POST', '/api/research/domains', { domains: domains }).then(function(data) {
     showToast('Research domains saved! (' + data.count + ' domains)', 'success');
+    // Reset edit flag and reload to show the normalized/sorted list
+    var el = document.getElementById('researchDomains');
+    el._userEdited = false;
+    loadResearchDomains();
   }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
 });
 
@@ -1214,6 +1218,15 @@ function loadProjects() {
       }
 
       if (g.status === 'completed') {
+        // Check if there are unfinished steps (stuck/prematurely completed)
+        var unfinished = g.steps.filter(function(s) { return s.status === 'active' || s.status === 'pending'; });
+        if (unfinished.length > 0) {
+          var resumeBtn = document.createElement('button');
+          resumeBtn.className = 'success'; resumeBtn.textContent = '\u25B6 Resume (' + unfinished.length + ' steps left)';
+          resumeBtn.addEventListener('click', function() { resumeProject(g.id); });
+          actions.appendChild(resumeBtn);
+        }
+
         var saveTemplateBtn = document.createElement('button');
         saveTemplateBtn.className = 'secondary'; saveTemplateBtn.textContent = 'Save as Template';
         saveTemplateBtn.addEventListener('click', function() { saveProjectAsTemplate(g); });
@@ -1315,6 +1328,19 @@ function skipProjectStep(projectId, stepId) {
   }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
 }
 
+function resumeProject(id) {
+  api('POST', '/api/projects/' + id + '/resume').then(function(data) {
+    if (data.resumed) {
+      showToast('Project resumed! ' + data.remainingSteps + ' steps remaining. Next: ' + (data.activeStep || 'unknown'), 'success');
+      loadProjects();
+      // Automatically start executing
+      setTimeout(function() { autoExecuteProject(id); }, 1000);
+    } else {
+      showToast('Could not resume project', 'error');
+    }
+  }).catch(function(e) { showToast('Failed: ' + e.message, 'error'); });
+}
+
 function deleteProject(id) {
   var deleteFiles = confirm('Delete this project?\n\nClick OK to delete.\n(Output files will be kept unless you also clean workspace.)');
   if (!deleteFiles) return;
@@ -1389,14 +1415,46 @@ function showProjectFiles(projectId, projectTitle) {
           'title="Download ' + esc(f.name) + '">\u2B07 Download</a>' +
       '</div>';
     });
+    // Add Compile Manuscript button if there are chapter files
+    var hasChapters = data.files.some(function(f) { return f.name.match(/write-chapter-\d+/); });
+    var hasManuscript = data.files.some(function(f) { return f.name === 'manuscript.md' || f.name === 'manuscript.docx'; });
+    var compileRow = '';
+    if (hasChapters) {
+      compileRow = '<div style="margin-top:10px;padding:10px;background:#0f3460;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">' +
+        '<span style="font-size:13px;">\u{1F4D6} ' + (hasManuscript ? 'Manuscript compiled' : 'Combine all chapters into one file') + '</span>' +
+        '<button onclick="compileManuscript(\'' + esc(projectId) + '\')" style="background:#e67e22;color:#fff;padding:6px 16px;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;">' +
+        (hasManuscript ? '\u{1F504} Recompile' : '\u{1F4D6} Compile Manuscript') + '</button>' +
+      '</div>';
+    }
     var closeRow = '<div style="text-align:right;margin-top:8px;"><span class="file-panel-close" style="color:#7f8c8d;cursor:pointer;font-size:12px;">Close</span></div>';
-    filePanel.innerHTML = header + fileRows + closeRow;
+    filePanel.innerHTML = header + fileRows + compileRow + closeRow;
     targetCard.appendChild(filePanel);
     var closeBtn = filePanel.querySelector('.file-panel-close');
     if (closeBtn) closeBtn.addEventListener('click', function() { filePanel.remove(); });
   }).catch(function(e) {
     showToast('Failed to load files: ' + e.message, 'error');
   });
+}
+
+function compileManuscript(projectId) {
+  showToast('Compiling manuscript... this may take a moment.', 'info');
+  api('POST', '/api/projects/' + projectId + '/compile').then(function(data) {
+    if (data.success) {
+      showToast('Manuscript compiled! ' + data.chapters + ' chapters, ~' + data.totalWords.toLocaleString() + ' words. Refresh file list to download.', 'success');
+      // Close and reopen file panel to show the new manuscript files
+      var panel = document.getElementById('file-list-' + projectId);
+      if (panel) panel.remove();
+      // Find project title for reload
+      var cards = document.querySelectorAll('#projectList .project-item');
+      cards.forEach(function(card) {
+        if (card.textContent.indexOf(projectId) !== -1 || card.querySelector('[onclick*="' + projectId + '"]')) {
+          // Just reopen with a slight delay
+        }
+      });
+    } else {
+      showToast(data.error || 'Compile failed', 'error');
+    }
+  }).catch(function(e) { showToast('Compile failed: ' + e.message, 'error'); });
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -830,6 +830,52 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
     res.json({ project: engine.getProject(req.params.id) });
   });
 
+  // ── Resume a stuck/completed project that still has pending or active steps ──
+  app.post('/api/projects/:id/resume', (req: Request, res: Response) => {
+    const engine = gateway.getProjectEngine?.();
+    if (!engine) {
+      return res.status(503).json({ error: 'Project engine not initialized' });
+    }
+    const project = engine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    // Fix orphaned active steps — reset all but the first to pending
+    const activeSteps = project.steps.filter((s: any) => s.status === 'active');
+    if (activeSteps.length > 1) {
+      // Keep only the first active step, reset the rest to pending
+      for (let i = 1; i < activeSteps.length; i++) {
+        activeSteps[i].status = 'pending';
+      }
+    }
+
+    // If all remaining steps are 'pending' but none are 'active', activate the first one
+    const hasActive = project.steps.some((s: any) => s.status === 'active');
+    if (!hasActive) {
+      const nextPending = project.steps.find((s: any) => s.status === 'pending');
+      if (nextPending) nextPending.status = 'active';
+    }
+
+    // Set project status back to active
+    const remaining = project.steps.filter((s: any) => s.status === 'pending' || s.status === 'active');
+    if (remaining.length > 0) {
+      project.status = 'active';
+      delete (project as any).completedAt;
+      project.updatedAt = new Date().toISOString();
+    }
+
+    // Recalculate progress
+    const done = project.steps.filter((s: any) => s.status === 'completed' || s.status === 'skipped').length;
+    project.progress = Math.round((done / project.steps.length) * 100);
+
+    res.json({
+      resumed: true,
+      status: project.status,
+      progress: project.progress,
+      activeStep: project.steps.find((s: any) => s.status === 'active')?.label || null,
+      remainingSteps: remaining.length,
+    });
+  });
+
   app.delete('/api/projects/:id', async (req: Request, res: Response) => {
     const engine = gateway.getProjectEngine?.();
     if (!engine) {
@@ -1353,6 +1399,90 @@ export function createAPIRoutes(app: Application, gateway: any, rootDir?: string
 
     const { createReadStream } = await import('fs');
     createReadStream(filePath).pipe(res);
+  });
+
+  // ── Compile Manuscript (combine all chapter files into one) ──
+
+  app.post('/api/projects/:id/compile', async (req: Request, res: Response) => {
+    const engine = gateway.getProjectEngine?.();
+    if (!engine) return res.status(503).json({ error: 'Project engine not initialized' });
+    const project = engine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const { join: j } = await import('path');
+    const { readdir: rd, readFile: rf, writeFile: wf } = await import('fs/promises');
+    const { existsSync: ex } = await import('fs');
+
+    const projectSlug = project.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const projectDir = j(baseDir, 'workspace', 'projects', projectSlug);
+
+    if (!ex(projectDir)) return res.status(404).json({ error: 'No project files found' });
+
+    try {
+      const entries = await rd(projectDir);
+
+      // Find all chapter step files (writing phase steps)
+      const writingSteps = project.steps
+        .filter((s: any) => s.phase === 'writing' && s.status === 'completed')
+        .sort((a: any, b: any) => (a.chapterNumber || 0) - (b.chapterNumber || 0));
+
+      const chapterContents: string[] = [];
+      for (const ws of writingSteps) {
+        const expectedFile = `${(ws as any).id}-${(ws as any).label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
+        const fullPath = j(projectDir, expectedFile);
+        if (ex(fullPath)) {
+          const raw = await rf(fullPath, 'utf-8');
+          // Strip the step header (# Step Title) if present
+          const content = raw.replace(/^# .+\n\n/, '');
+          chapterContents.push(`## Chapter ${(ws as any).chapterNumber || chapterContents.length + 1}\n\n${content}`);
+        }
+      }
+
+      // Fallback: if no phase-tagged steps, find chapter files by filename pattern
+      if (chapterContents.length === 0) {
+        const chapterFiles = entries
+          .filter(f => f.match(/write-chapter-\d+\.md$/))
+          .sort((a, b) => {
+            const numA = parseInt(a.match(/chapter-(\d+)/)?.[1] || '0');
+            const numB = parseInt(b.match(/chapter-(\d+)/)?.[1] || '0');
+            return numA - numB;
+          });
+        for (const cf of chapterFiles) {
+          const raw = await rf(j(projectDir, cf), 'utf-8');
+          const content = raw.replace(/^# .+\n\n/, '');
+          const chNum = parseInt(cf.match(/chapter-(\d+)/)?.[1] || '0');
+          chapterContents.push(`## Chapter ${chNum}\n\n${content}`);
+        }
+      }
+
+      if (chapterContents.length === 0) {
+        return res.status(400).json({ error: 'No chapter files found to compile' });
+      }
+
+      // Build manuscript markdown
+      const manuscriptMd = `# ${project.title}\n\n` + chapterContents.join('\n\n---\n\n');
+      await wf(j(projectDir, 'manuscript.md'), manuscriptMd, 'utf-8');
+
+      // Also generate DOCX
+      try {
+        const docxBuffer = await generateDocxBuffer({
+          title: project.title,
+          author: 'AuthorClaw',
+          content: manuscriptMd,
+        });
+        await wf(j(projectDir, 'manuscript.docx'), docxBuffer);
+      } catch { /* DOCX generation is non-fatal */ }
+
+      const totalWords = manuscriptMd.split(/\s+/).length;
+      res.json({
+        success: true,
+        chapters: chapterContents.length,
+        totalWords,
+        files: ['manuscript.md', 'manuscript.docx'],
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Compile failed: ' + String(err) });
+    }
   });
 
   // ═══════════════════════════════════════════════════════════

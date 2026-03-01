@@ -25,7 +25,10 @@ export class ResearchGate {
     if (existsSync(this.allowlistPath)) {
       const raw = await readFile(this.allowlistPath, 'utf-8');
       const data = JSON.parse(raw);
-      this.allowedDomains = new Set(data.domains || []);
+      // Normalize on load — same as setDomains() to prevent case/www mismatches
+      this.allowedDomains = new Set(
+        (data.domains || []).map((d: string) => d.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean)
+      );
     }
   }
 
@@ -34,17 +37,22 @@ export class ResearchGate {
   }
 
   getAllowedDomains(): string[] {
-    return Array.from(this.allowedDomains);
+    return Array.from(this.allowedDomains).sort();
   }
 
   /**
    * Replace the domain allowlist and persist to disk.
    */
   async setDomains(domains: string[]): Promise<void> {
-    this.allowedDomains = new Set(domains.map(d => d.trim().toLowerCase()).filter(Boolean));
+    // Normalize: lowercase, strip www prefix, deduplicate, sort for consistent display
+    const normalized = domains
+      .map(d => d.trim().toLowerCase().replace(/^www\./, ''))
+      .filter(Boolean);
+    this.allowedDomains = new Set(normalized);
+    const sorted = Array.from(this.allowedDomains).sort();
     const data = {
       description: 'Approved domains for AuthorClaw research. Add domains as needed for your writing projects.',
-      domains: Array.from(this.allowedDomains),
+      domains: sorted,
     };
     await writeFile(this.allowlistPath, JSON.stringify(data, null, 2), 'utf-8');
   }

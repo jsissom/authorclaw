@@ -1173,13 +1173,15 @@ Description: ${description}`;
       step.result = result;
     }
 
-    // Calculate progress
-    const completed = project.steps.filter(s => s.status === 'completed').length;
-    project.progress = Math.round((completed / project.steps.length) * 100);
+    // Calculate progress (include skipped as "done")
+    const done = project.steps.filter(s => s.status === 'completed' || s.status === 'skipped').length;
+    project.progress = Math.round((done / project.steps.length) * 100);
     project.updatedAt = new Date().toISOString();
 
-    // Find next pending step
-    const next = project.steps.find(s => s.status === 'pending');
+    // Find next step to run — prefer pending, then check for orphaned active steps
+    // (active steps can occur from race conditions in concurrent auto-execute)
+    const next = project.steps.find(s => s.status === 'pending')
+              || project.steps.find(s => s.status === 'active' && s.id !== stepId);
     if (next) {
       next.status = 'active';
       // Enrich the next prompt with results from completed steps
@@ -1187,9 +1189,12 @@ Description: ${description}`;
       return next;
     }
 
-    // All steps done — mark project complete
-    project.status = 'completed';
-    project.completedAt = new Date().toISOString();
+    // Truly all steps done — mark project complete only if no pending/active remain
+    const remaining = project.steps.filter(s => s.status === 'pending' || s.status === 'active');
+    if (remaining.length === 0) {
+      project.status = 'completed';
+      project.completedAt = new Date().toISOString();
+    }
     return null;
   }
 
