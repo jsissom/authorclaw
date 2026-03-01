@@ -27,6 +27,7 @@ Tell it what you want. It figures out the steps, picks the right skills and tool
 - **Analyze** — Voice profiling (47 markers), pacing heatmaps, tension mapping
 - **Format** — Export manuscripts to agent-ready DOCX, KDP PDF, EPUB, Markdown
 - **Manage** — Track projects, word counts, deadlines
+- **Listen** — Neural TTS voice engine with 8 author-optimized presets — hear your writing read aloud
 - **Ingest Tools** — Read source code of any tool and create a new skill from it
 
 ---
@@ -35,7 +36,7 @@ Tell it what you want. It figures out the steps, picks the right skills and tool
 
 1. **You say what you want** — via Telegram, dashboard, or API
 2. **AuthorClaw plans the steps** — AI dynamically decomposes your task into executable steps
-3. **Skills are auto-selected** — 25+ writing skills get injected into each step's context
+3. **Skills are auto-selected** — 39 writing skills get injected into each step's context
 4. **Work happens autonomously** — each step runs through the AI, output saved to files
 5. **Everything is logged** — universal activity feed tracks all agent actions in real-time
 
@@ -100,12 +101,12 @@ See [QUICKSTART.md](QUICKSTART.md) for the full setup guide.
 │  └───────────┘   └─────────────────┘   │ OpenAI ($$)    │  │
 │                                         └────────────────┘  │
 │  ┌───────────┐   ┌─────────────────┐   ┌────────────────┐  │
-│  │ Soul      │   │ Project Engine  │   │ Skills (25+)   │  │
+│  │ Soul      │   │ Project Engine  │   │ Skills (39)    │  │
 │  │           │   │                  │   │                │  │
-│  │ SOUL.md   │   │ Dynamic AI Plan │   │ Core           │  │
-│  │ STYLE.md  │   │ Novel Pipeline  │   │ Author (16)    │  │
+│  │ SOUL.md   │   │ Dynamic AI Plan │   │ Core (7)       │  │
+│  │ STYLE.md  │   │ Novel Pipeline  │   │ Author (17)    │  │
 │  │ VOICE.md  │   │ Auto-Execute    │   │ Marketing (4)  │  │
-│  │           │   │ DOCX Assembly   │   │ Premium (6)    │  │
+│  │           │   │ DOCX Assembly   │   │ Premium (11)   │  │
 │  └───────────┘   └─────────────────┘   └────────────────┘  │
 │                                                             │
 │  ┌───────────┐   ┌─────────────────┐   ┌────────────────┐  │
@@ -154,6 +155,8 @@ Connect a Telegram bot to control AuthorClaw from your phone:
 | `/files [folder]` | List output files (numbered for easy `/read` and `/export`) |
 | `/read [# or name]` | Preview a file's contents |
 | `/export [# or name] [format]` | Export to Word (.docx), HTML, or TXT |
+| `/speak [text or #]` | Generate a voice message — text or read a file aloud |
+| `/voice [on/off/preset]` | Toggle voice chat responses (all replies become voice + text) |
 | `/clean` | View workspace disk usage and clean up old files |
 
 ### Example Session
@@ -192,13 +195,44 @@ Open `http://localhost:3847` to access the web dashboard:
 
 ---
 
+## Voice & Text-to-Speech
+
+AuthorClaw includes a built-in neural voice engine powered by Microsoft Edge TTS — no API keys, no binary installation, no cost.
+
+**8 author-optimized voice presets:**
+
+| Preset | Best For |
+|--------|----------|
+| `narrator_female` | Most genres — clear, expressive (default) |
+| `narrator_male` | Literary fiction, thrillers |
+| `narrator_deep` | Epic fantasy, sci-fi, nonfiction |
+| `narrator_warm` | Romance, memoir |
+| `british_male` | Period pieces, cozy mysteries |
+| `british_female` | Elegant literary fiction |
+| `storyteller` | Adventure, YA |
+| `dramatic` | Action, thriller, horror |
+
+**Telegram voice features:**
+- `/speak Hello world` — Generate and send a voice message
+- `/speak narrator_deep In a world...` — Use a specific voice
+- `/speak 3` — Read file #3 from your last `/files` listing aloud
+- `/voice on` — Toggle voice mode (all chat replies become voice + text)
+- `/voice narrator_deep` — Set voice mode with a specific preset
+- "Read that back" — Re-read the last response as voice
+
+**API:** `POST /api/audio/generate` with `{ text, voice, rate, pitch, volume }`
+
+Audio files are auto-cleaned after 24 hours. Use `/clean audio` to clear them manually.
+
+---
+
 ## Dynamic Task Planning
 
 When you give AuthorClaw a task, it doesn't use hardcoded templates. Instead:
 
 1. The AI receives a catalog of all available skills (with descriptions and triggers)
 2. The AI receives the list of Author OS tools
-3. The AI dynamically plans the right number of steps, picks the right skills for each
+3. The AI dynamically plans the right number of steps, picks the right skills (39 and counting) for each
 4. Each step is executed with that skill's full content injected into the AI's context
 5. Results from earlier steps are chained into later steps for continuity
 
@@ -210,26 +244,31 @@ If AI planning fails, the system falls back to template-based planning (8 projec
 
 Skills are markdown files that teach the AI how to handle specific writing tasks:
 
-**Author Skills (16):** premise, outline, write, revise, book-bible, series-bible, dialogue, style-clone, research, nonfiction-research, format, beta-reader, query-letter, manuscript-hub, market-research, promote
+**Core Skills (7):** full-pipeline, preference-learner, prompt-optimizer, self-improve, skill-acquisition, error-recovery, after-action-review
+
+**Author Skills (17):** premise, outline, write, revise, book-bible, series-bible, dialogue, style-clone, research, nonfiction-research, format, beta-reader, query-letter, manuscript-hub, market-research, promote, ingest-tool
 
 **Marketing Skills (4):** blurb-writer, ad-copy, social-media, email-list
 
-**Core Skills:** full-pipeline (complete novel orchestration), plus system skills
-
 **Tool Ingestion:** AuthorClaw can read source code of any tool and generate a new skill from it. Just say "create a skill from this code" or use `POST /api/tools/ingest`.
 
-Skills are automatically matched by keyword triggers and injected into the AI's context.
+Skills are automatically matched by keyword triggers and injected into the AI's context. A full reference with descriptions and example trigger keywords is available in `workspace/SKILLS.txt`.
 
 ### Premium Skills Bundle
 
-The **AuthorClaw Premium Skills Bundle** adds 6 advanced capabilities — available on our [Ko-Fi store](https://ko-fi.com/s/4e24f1dfa5):
+The **AuthorClaw Premium Skills Bundle** adds 11 advanced capabilities — available on our [Ko-Fi store](https://ko-fi.com/s/4e24f1dfa5):
 
-- **Ghostwriter Pro** — A full-stack AI writing partner. Scene generation with deep write mode and multi-pass revision. Pacing analysis, tension mapping, dialogue polish, and style consistency checks. Handles everything from first draft to final polish.
-- **Series Architect** — Multi-book series planning and continuity engine. Story thread tracker, timeline management, character arc plotting across books, and series revenue projection tools. Essential for anyone writing a series.
-- **Book Launch Machine** — Complete 60-day book launch automation. Ad copy factory (Amazon, Facebook, BookBub), email marketing sequences, social media content calendar, and launch day checklists. Turns your release into an event.
-- **Dictation Cleanup Pro** — Speech-to-text cleanup with 3 intensity levels. Understands author voice patterns and preserves intentional style choices. Cleans up dictation artifacts, fixes punctuation, and polishes prose while keeping your voice intact.
-- **AuthorScribe Audio** — Text-to-speech audio generation using Microsoft Edge neural voices (300+ voices, 40+ languages). Generate audio versions of chapters, scenes, or full manuscripts. Great for self-editing by ear and creating audio content. *Personal and non-commercial use only.*
-- **Builder's Guide** *(Bonus)* — Step-by-step documentation for customizing and extending AuthorClaw. Build your own skills, add new AI providers, create custom workflows, and tailor the agent to your exact writing process.
+- **Ghostwriter Pro** — A full-stack AI writing partner. Scene generation with deep write mode and multi-pass revision. Pacing analysis, tension mapping, dialogue polish, and style consistency checks.
+- **Series Architect** — Multi-book series planning and continuity engine. Story thread tracker, timeline management, character arc plotting across books.
+- **Book Launch Machine** — Complete 60-day book launch automation. Ad copy factory (Amazon, Facebook, BookBub), email marketing sequences, social media content calendar.
+- **First Chapter Hook** — Analyze and rewrite first chapters for maximum reader retention using genre-specific hook patterns.
+- **Comp Title Finder** — Find and analyze comparable titles for query letters, marketing, and positioning strategy.
+- **Dictation Cleanup** — Speech-to-text cleanup that preserves your voice. Cleans up dictation artifacts, fixes punctuation, polishes prose.
+- **Sensitivity Reader** — AI-assisted sensitivity review for representation, cultural accuracy, and potential reader concerns.
+- **Read Aloud** — Text-to-speech for manuscripts using the built-in Edge TTS neural voice engine.
+- **Narrative Voice Coach** — Deep coaching for developing a distinctive, consistent narrative voice.
+- **Deep Voice Analysis** — Advanced 47-marker voice analysis engine for building comprehensive Voice Profiles.
+- **Writing Secrets Bridges** — Import Book Bible Engine data and Author Workflow Engine sequences into AuthorClaw.
 
 Install: copy the skill folders to `skills/premium/` and restart. See `skills/premium/README.md` for details.
 
@@ -249,9 +288,9 @@ authorclaw/
 │   └── skills/loader.ts  # Skill loading and matching
 ├── skills/               # Skill definitions (SKILL.md files)
 │   ├── core/             # System skills (full-pipeline, etc.)
-│   ├── author/           # Writing skills (16)
+│   ├── author/           # Writing skills (17)
 │   ├── marketing/        # Marketing skills (4)
-│   └── premium/          # Premium skill packs (6)
+│   └── premium/          # Premium skill packs (11)
 ├── dashboard/dist/       # Web dashboard (single HTML file)
 ├── workspace/            # Working directory
 │   ├── soul/             # SOUL.md, STYLE-GUIDE.md, VOICE-PROFILE.md
@@ -259,6 +298,8 @@ authorclaw/
 │   ├── projects/         # Project output files organized by project
 │   ├── research/         # Research output files
 │   ├── .agent/           # Agent journal, self-improve logs
+│   ├── audio/            # Generated TTS voice files (auto-cleaned after 24hr)
+│   ├── SKILLS.txt        # Full skill reference with trigger keywords
 │   ├── .activity/        # Universal activity log (JSONL)
 │   └── .audit/           # Security audit log (JSONL)
 ├── config/               # Configuration files
