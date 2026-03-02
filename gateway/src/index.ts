@@ -88,8 +88,16 @@ class AuthorClawGateway {
   constructor() {
     this.app = express();
     this.server = createServer(this.app);
+
+    const hostname = process.env.HOSTNAME ?? 'localhost';
+    const port = 3847;
+    const allowedOrigins = [
+      `http://${hostname}:${port}`,
+      `http://127.0.0.1:${port}`,
+    ];
+
     this.io = new SocketIO(this.server, {
-      cors: { origin: ['http://localhost:3847', 'http://127.0.0.1:3847'] },
+      cors: { origin: allowedOrigins },
     });
 
     // Security middleware
@@ -99,11 +107,11 @@ class AuthorClawGateway {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", "'unsafe-inline'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          connectSrc: ["'self'", "http://localhost:3847", "http://127.0.0.1:3847"],
+          connectSrc: ["'self'", ...allowedOrigins],
         },
       },
     }));
-    this.app.use(cors({ origin: ['http://localhost:3847', 'http://127.0.0.1:3847'] }));
+    this.app.use(cors({ origin: allowedOrigins }));
     this.app.use(express.json({ limit: '5mb' }));
   }
 
@@ -549,7 +557,8 @@ class AuthorClawGateway {
   private setupWebSocket(): void {
     this.io.on('connection', (socket) => {
       const origin = socket.handshake.headers.origin;
-      const allowed = ['http://localhost:3847', 'http://127.0.0.1:3847'];
+      const hostname = process.env.HOSTNAME ?? 'localhost';
+      const allowed = [`http://${hostname}:3847`, 'http://127.0.0.1:3847'];
       if (origin && !allowed.includes(origin)) {
         this.audit.log('security', 'websocket_rejected', { origin });
         socket.disconnect();
