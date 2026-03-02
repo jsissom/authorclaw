@@ -1531,8 +1531,8 @@ class AuthorClawGateway {
   async start(): Promise<void> {
     await this.initialize();
     const port = this.config.get('server.port', 3847);
-    this.server.listen(port, '127.0.0.1', () => {
-      // Bound to localhost only for security
+    this.server.listen(port, '0.0.0.0', () => {
+      // Must listen to all interfaces so you can access it outside of docker
     });
   }
 
